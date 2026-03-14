@@ -1,0 +1,36 @@
+[project]
+name = "coronary-stenosis-detection"
+version = "1.0.0"
+description = ""
+authors = [
+    {name = "Kamil Rudny (krudny)"},
+    {name = "Piotr Rusak (piotrrusak)"},
+    {name = "Łukasz Kwinta (lkwinta)", email = "lukaszmind@gmail.com"}
+]
+readme = "README.md"
+
+requires-python = "==3.11.*"
+
+dependencies = [
+    "matplotlib",
+    "numpy",
+    "ipykernel",
+    "jupyterlab",
+    "ipywidgets",
+    "pandas",
+    "seaborn",
+    "datasets",
+    "opencv-python",
+    "pycocotools"
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit",
+    "ruff"
+]
+
+[tool.ruff.lint]
+ignore = [
+    "E731",  # lambda expressions
+]
