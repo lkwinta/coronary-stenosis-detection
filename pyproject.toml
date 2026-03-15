@@ -21,7 +21,10 @@ dependencies = [
     "seaborn",
     "datasets",
     "opencv-python",
-    "pycocotools"
+    "pycocotools",
+    "segmentation_models_pytorch",
+    "albumentations",
+    "scikit-learn"
 ]
 
 [dependency-groups]
