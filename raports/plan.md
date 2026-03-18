@@ -23,7 +23,8 @@ Moduł odpowiada za normalizację obrazów wejściowych. Typowa transformacja da
 - wybór klatki filmu, jeśli dodamy wsparcie filmów na wejściu jak np w datasecie CoronaryDominance
 
 ## Moduł 2 - segmentacja
-Wykorzystamy sieć z rodziny U-Net do segmentacji naczyń. Nauczymy tą sieć na obrazkach ze zbioru DCA1, ze względu na dobre i dokładne maski. Docelowo pewnie wezmiemy jakiś pretrenowany U-Net z `segmentation_models_pytorch` i zrobimy fine-tuning.
+Wykorzystamy sieć z rodziny U-Net do segmentacji naczyń. Nauczymy tą sieć na obrazkach ze zbioru DCA1, ze względu na dobre i dokładne maski. Docelowo pewnie wezmiemy jakiś pretrenowany U-Net z `segmentation_models_pytorch` i zrobimy fine-tuning. Spróbujemy także wykorzystać zbiór `syntax`
+z `ARCADE`, żeby powiększyć zbiór na którym trenujemy nasz model - DCA1 jest bardzo małe.
 
 ## Moduł 3 - ekstrakcją topologii
 Na podstawie maski segmentacji naczyń, za pomocą operacji morfologicznych jak np `skeletonize`, stworzymy graf naczyń widocznych na masce. Spróbujemy wykryć w ten sposób linię środkową naczyń (`centerline`) i rozwidlenia naczyń
