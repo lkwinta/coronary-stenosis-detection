@@ -24,7 +24,8 @@ dependencies = [
     "pycocotools",
     "segmentation_models_pytorch",
     "albumentations",
-    "scikit-learn"
+    "scikit-learn",
+    "coronary-analysis"
 ]
 
 [dependency-groups]
@@ -37,3 +38,6 @@ dev = [
 ignore = [
     "E731",  # lambda expressions
 ]
+
+[tool.uv.sources]
+coronary-analysis = { path = "coronary-analysis", editable = true }

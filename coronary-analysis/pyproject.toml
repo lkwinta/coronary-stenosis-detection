@@ -1,0 +1,15 @@
+[project]
+name = "coronary-analysis"
+version = "0.1.0"
+description = "A package for coronary stenosis detection and analysis."
+authors = [
+    {name = "Kamil Rudny (krudny)"},
+    {name = "Piotr Rusak (piotrrusak)"},
+    {name = "Łukasz Kwinta (lkwinta)", email = "lukaszmind@gmail.com"}
+] 
+requires-python = ">=3.11"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
