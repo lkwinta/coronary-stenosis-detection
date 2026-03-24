@@ -34,6 +34,8 @@ class DCA1Dataset(Dataset):
         the dataset expects:
         - image: `"12.pgm"`
         - mask: `"12_gt.pgm"`
+        If ``None``, all `.pgm` files in ``image_dir`` that do not end with
+        ``_gt.pgm`` are used automatically.
     transform : callable, optional
         Transform or augmentation callable applied jointly to image and mask.
         Typically an `albumentations.Compose` object.
@@ -58,12 +60,21 @@ class DCA1Dataset(Dataset):
         image_dir : str
             Path to the directory containing `.pgm` images and `_gt.pgm` masks.
         stems : list[str] | None, optional
-            List of sample identifiers to include in the dataset.
+            List of sample identifiers to include in the dataset. If ``None``,
+            all `.pgm` files in ``image_dir`` that are not ground-truth masks
+            (i.e. do not end with ``_gt``) are discovered automatically.
         transform : callable, optional
             Transform applied jointly to image and mask.
         """
         self.image_dir = Path(image_dir)
-        self.stems = stems
+        if stems is None:
+            self.stems = sorted(
+                p.stem
+                for p in self.image_dir.glob("*.pgm")
+                if not p.stem.endswith("_gt")
+            )
+        else:
+            self.stems = stems
         self.transform = transform
 
     def __len__(self) -> int:
