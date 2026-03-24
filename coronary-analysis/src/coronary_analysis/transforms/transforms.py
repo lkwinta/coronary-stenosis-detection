@@ -8,7 +8,7 @@ def get_train_transforms(img_size: int):
             A.Resize(img_size, img_size, interpolation=cv2.INTER_AREA),
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.1),
-            A.ShiftScaleRotate(
+            A.Affine(
                 shift_limit=0.03,
                 scale_limit=0.08,
                 rotate_limit=12,
