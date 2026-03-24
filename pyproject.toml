@@ -25,7 +25,11 @@ dependencies = [
     "segmentation_models_pytorch",
     "albumentations",
     "scikit-learn",
-    "coronary-analysis"
+    "coronary-analysis",
+    "scikit-image",
+    "scipy",
+    "networkx",
+    "torch",
 ]
 
 [dependency-groups]
