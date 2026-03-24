@@ -375,6 +375,24 @@ wheels = [
 name = "coronary-analysis"
 version = "0.1.0"
 source = { editable = "coronary-analysis" }
+dependencies = [
+    { name = "albumentations" },
+    { name = "numpy" },
+    { name = "opencv-python" },
+    { name = "pycocotools" },
+    { name = "segmentation-models-pytorch" },
+    { name = "torch" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "albumentations" },
+    { name = "numpy" },
+    { name = "opencv-python" },
+    { name = "pycocotools" },
+    { name = "segmentation-models-pytorch" },
+    { name = "torch" },
+]
 
 [[package]]
 name = "coronary-stenosis-detection"
