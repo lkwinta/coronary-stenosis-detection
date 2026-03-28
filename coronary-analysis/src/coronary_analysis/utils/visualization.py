@@ -17,6 +17,9 @@ def show_image(*imgs, titles=None, cmap="gray", size=5):
     size : int, optional
         Size of each panel in inches. Default is ``5``.
     """
+    if not imgs:
+        raise ValueError("At least one image must be provided.")
+
     n = len(imgs)
     fig, axes = plt.subplots(1, n, figsize=(size * n, size))
     if n == 1:
@@ -35,6 +38,7 @@ def show_image(*imgs, titles=None, cmap="gray", size=5):
         axes[i].axis("off")
     plt.tight_layout()
     plt.show()
+    plt.close(fig)
 
 
 def plot_lines(data, *groups, size=5):
@@ -49,6 +53,9 @@ def plot_lines(data, *groups, size=5):
     size : int, optional
         Size of each panel in inches. Default is ``5``.
     """
+    if not groups:
+        raise ValueError("At least one group must be provided.")
+
     n = len(groups)
     fig, axes = plt.subplots(1, n, figsize=(size * n, size))
     if n == 1:
@@ -60,3 +67,4 @@ def plot_lines(data, *groups, size=5):
         ax.legend()
     plt.tight_layout()
     plt.show()
+    plt.close(fig)
