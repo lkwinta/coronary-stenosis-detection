@@ -36,7 +36,7 @@ Podzieliliśmy zbiór DCA1 na zbiór treningowy i testowy w stosunku 75/25, a na
 
 Jak widać zbiór DCA1 dostarcza dokładniejsze maski dlatego jest on docelowym zbiorem dla treningu modelu segmentacji.
 
-## Augemntacja danych
+## Augmentacja danych
 Zdecydowaliśmy się na wykorzystanie biblioteki `albumentations` do augmentacji danych. Nasza augmentacja jest dosyć agresywna i zawiera:
 
 * Resize - zmiana rozmiaru obrazka do 250x250
@@ -49,9 +49,9 @@ Zdecydowaliśmy się na wykorzystanie biblioteki `albumentations` do augmentacji
 * MotionBlur - rozmycie ruchowe
 * GaussNoise - dodanie szumu gaussowskiego
 
-## Trenging
+## Trening
 
-Zdecydowaliśmy się wykorzystać model UNet z biblioteki `segmentation_models_pytorch` jako bazowy benchmark dla segmentacji. Wybraliśmy pretrenowane wagi dla enkodera z modelu `resnet34` pretrenowany na zbiorze ImageNet.
+Zdecydowaliśmy się wykorzystać model UNet z biblioteki `segmentation_models_pytorch` jako bazowy benchmark dla segmentacji. Wybraliśmy pretrenowane wagi dla enkodera z modelu `resnet34` pretrenowanych na zbiorze ImageNet.
 
 Funkcja straty której użyliśmy to połączenie `BCEWithLogitsLoss` i `DiceLoss` z biblioteki `segmentation_models_pytorch`. Optymalizatorem jest `Adam` z domyślnymi parametrami.
 
@@ -91,10 +91,15 @@ Ostatecznie otrzymaliśmy średnie wartości metryk na zbiorze walidacyjnym DCA1
 ## Co dalej?
 Spróbujemy wykorzystać inne architektury takie jak UNet++ czy DeepLabV3 lub modele z własnym, czystym enkoderem. Dodatkowo spróbujemy różnych funkcji strat. Na pewno musimy też wykorzystać walidację skrośną aby wykorzystać lepiej mały zbiór DCA1. Musimy również wykorzystać narzędzia do optymalizacji hiperparametrów takie jak `Optuna` aby dostosować parametry metryk i modeli.
 
-# POC tworzenia grafu naczyń
+# Proof of concept tworzenia grafu naczyń
 Zaczęliśmy także wczesne prace nad tworzeniem skryptu do tworzenia grafu naczyń z segmentacji. Na razie testujemy klasyczny deterministyczny algorytm skeletonizacji wykorzystujący operacje morfologiczne. Na razie do testów wykorzystujemy maski z DCA1, jako, że nasza segmentacja nie jest jeszcze idealna.
-
-Istotnym problemem okazuje się detekcja węzłów gdyż na płaskich obrazkach 2D często naczynia się nakładają, co na segmentacji wygląda jak węzeł.
 
 Przykładowy wynik naszej szkieletyzacji dla jednego z obrazków DCA1 wygląda następująco:
 
+![Wyodrębnienie linii centralnej naczynia](imgs/skeletonization.png)
+
+Istotnym problemem okazuje się detekcja węzłów. Problem wynika z faktu, że obrazy są rzutem trójwymiarowej struktury naczyniowej na dwuwymiarową płaszczyznę. W miejscach, gdzie dwa naczynia przebiegają blisko siebie lub się krzyżują, ich segmentacje mogą się nachodzić, tworząc na masce binarnej kształt łudząco podobny do prawdziwego rozgałęzienia. Algorytm szkieletyzacji oparty na operacjach morfologicznych nie jest w stanie odróżnić faktycznej bifurkacji od takiego artefaktu nakładania, co prowadzi do fałszywych węzłów w grafie naczyniowym.
+
+W następnym etapie postaramy się zastosować inne podejścia porównując ich skuteczność w detekcji bifurkacji naczyń. 
+
+![Problem z detekcją węzłów](imgs/bifurcation_issue.png)
