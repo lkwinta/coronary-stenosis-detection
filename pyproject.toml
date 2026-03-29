@@ -12,7 +12,6 @@ readme = "README.md"
 requires-python = "==3.11.*"
 
 dependencies = [
-    "matplotlib",
     "numpy",
     "ipykernel",
     "jupyterlab",
@@ -25,7 +24,8 @@ dependencies = [
     "segmentation_models_pytorch",
     "albumentations",
     "scikit-learn",
-    "coronary-analysis"
+    "coronary-analysis",
+    "matplotlib",
 ]
 
 [dependency-groups]

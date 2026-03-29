@@ -15,6 +15,7 @@ dependencies = [
     "albumentations",
     "pycocotools",
     "segmentation-models-pytorch",
+    "matplotlib",
 ]
 
 [build-system]
