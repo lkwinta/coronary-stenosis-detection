@@ -20,15 +20,17 @@ class ConvBlock(nn.Module):
         Number of output channels.
     """
 
-    def __init__(self, in_channels: int, out_channels: int):
+    def __init__(self, in_channels: int, out_channels: int, dropout: float = 0.5):
         super().__init__()
         self.block = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
+            nn.Dropout2d(dropout),
             nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
+            nn.Dropout2d(dropout),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -62,9 +64,17 @@ class DecoderBlock(nn.Module):
         Number of output channels after fusion.
     """
 
-    def __init__(self, in_channels: int, skip_channels: int, out_channels: int):
+    def __init__(
+        self,
+        in_channels: int,
+        skip_channels: int,
+        out_channels: int,
+        dropout: float = 0.5,
+    ):
         super().__init__()
-        self.conv = ConvBlock(in_channels + skip_channels, out_channels)
+        self.conv = ConvBlock(
+            in_channels + skip_channels, out_channels, dropout=dropout
+        )
 
     def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
         """
@@ -103,6 +113,7 @@ class SimpleUNetDecoder(nn.Module):
         self,
         encoder_channels: Sequence[int],
         decoder_channels: Sequence[int] = (256, 128, 64, 32),
+        dropout: float = 0.5,
     ):
         super().__init__()
 
@@ -126,7 +137,7 @@ class SimpleUNetDecoder(nn.Module):
 
         self.blocks = nn.ModuleList(
             [
-                DecoderBlock(in_ch, skip_ch, out_ch)
+                DecoderBlock(in_ch, skip_ch, out_ch, dropout=dropout)
                 for in_ch, skip_ch, out_ch in zip(
                     in_channels, skip_channels, decoder_channels
                 )

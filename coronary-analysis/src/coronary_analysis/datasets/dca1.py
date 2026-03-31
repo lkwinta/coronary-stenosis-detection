@@ -1,9 +1,24 @@
-from pathlib import Path
+import os
 
 import cv2
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+import albumentations as A
+
+
+def get_dca1_pairs(image_dir: str) -> list[tuple[str, str]]:
+    files = set(os.listdir(image_dir))
+    pairs = []
+
+    for file in files:
+        if file.endswith(".pgm") and not file.endswith("_gt.pgm"):
+            file_num = file[:-4]  # Remove .pgm extension
+            gt_file = f"{file_num}_gt.pgm"
+            if gt_file in files:
+                pairs.append((file, gt_file))
+
+    return pairs
 
 
 class DCA1Dataset(Dataset):
@@ -49,8 +64,8 @@ class DCA1Dataset(Dataset):
     def __init__(
         self,
         image_dir: str,
-        stems: list[str] = None,
-        transform=None,
+        pairs: list[tuple[str, str]] = None,
+        transform: A.Compose | None = None,
     ) -> None:
         """
         Initialize the dataset.
@@ -59,22 +74,18 @@ class DCA1Dataset(Dataset):
         ----------
         image_dir : str
             Path to the directory containing `.pgm` images and `_gt.pgm` masks.
-        stems : list[str] | None, optional
-            List of sample identifiers to include in the dataset. If ``None``,
+        pairs : list[tuple[str, str]] | None, optional
+            List of image-mask pairs to include in the dataset. If ``None``,
             all `.pgm` files in ``image_dir`` that are not ground-truth masks
             (i.e. do not end with ``_gt``) are discovered automatically.
         transform : callable, optional
             Transform applied jointly to image and mask.
         """
-        self.image_dir = Path(image_dir)
-        if stems is None:
-            self.stems = sorted(
-                p.stem
-                for p in self.image_dir.glob("*.pgm")
-                if not p.stem.endswith("_gt")
-            )
+        self.image_dir = image_dir
+        if pairs is None:
+            self.pairs = get_dca1_pairs(image_dir)
         else:
-            self.stems = stems
+            self.pairs = pairs
         self.transform = transform
 
     def __len__(self) -> int:
@@ -86,7 +97,7 @@ class DCA1Dataset(Dataset):
         int
             Number of image-mask pairs.
         """
-        return len(self.stems)
+        return len(self.pairs)
 
     def __getitem__(self, idx: int):
         """
@@ -119,10 +130,10 @@ class DCA1Dataset(Dataset):
         FileNotFoundError
             If the image or mask file does not exist or cannot be read.
         """
-        stem = self.stems[idx]
+        stem_img, stem_mask = self.pairs[idx]
 
-        img_path = self.image_dir / f"{stem}.pgm"
-        mask_path = self.image_dir / f"{stem}_gt.pgm"
+        img_path = os.path.join(self.image_dir, stem_img)
+        mask_path = os.path.join(self.image_dir, stem_mask)
 
         image = cv2.imread(str(img_path), cv2.IMREAD_GRAYSCALE)
         mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)

@@ -16,6 +16,7 @@ dependencies = [
     "pycocotools",
     "segmentation-models-pytorch",
     "matplotlib",
+    "parse"
 ]
 
 [build-system]
