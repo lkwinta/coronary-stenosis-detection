@@ -26,6 +26,7 @@ dependencies = [
     "scikit-learn",
     "coronary-analysis",
     "matplotlib",
+    "scikit-image"
 ]
 
 [dependency-groups]
