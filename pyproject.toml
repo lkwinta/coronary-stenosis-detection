@@ -28,6 +28,7 @@ dependencies = [
     "matplotlib",
     "optuna",
     "optuna-dashboard",
+    "scikit-image"
 ]
 
 [dependency-groups]
