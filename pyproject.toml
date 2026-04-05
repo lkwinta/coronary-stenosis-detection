@@ -26,9 +26,11 @@ dependencies = [
     "scikit-learn",
     "coronary-analysis",
     "matplotlib",
+    "scikit-image",
+    "sknw",
+    "networkx",
     "optuna",
     "optuna-dashboard",
-    "scikit-image"
 ]
 
 [dependency-groups]
