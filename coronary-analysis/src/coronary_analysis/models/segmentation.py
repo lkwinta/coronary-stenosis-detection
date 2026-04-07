@@ -139,12 +139,6 @@ class CoronaryUNetPP(nn.Module):
             encoder_weights=encoder_weights,
             in_channels=1,
             classes=1,
-            aux_params={
-                "dropout": 0.5,
-                "classes": 1,
-                "pooling": "max",
-                "activation": None,
-            },
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

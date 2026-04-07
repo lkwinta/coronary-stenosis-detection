@@ -7,12 +7,15 @@ def get_train_transforms(img_size: int):
         [
             A.Resize(img_size, img_size, interpolation=cv2.INTER_AREA),
             A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.2),
             A.Affine(
-                shift_limit=0.03,
-                scale_limit=0.08,
-                rotate_limit=12,
+                scale=(0.92, 1.08),
+                translate_percent=(-0.03, 0.03),
+                rotate=(-12, 12),
+                interpolation=cv2.INTER_LINEAR,
+                mask_interpolation=cv2.INTER_NEAREST,
                 border_mode=cv2.BORDER_CONSTANT,
+                fill=0,
+                fill_mask=0,
                 p=0.5,
             ),
             A.OneOf(

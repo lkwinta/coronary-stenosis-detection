@@ -7,7 +7,7 @@ authors = [
     {name = "Piotr Rusak (piotrrusak)"},
     {name = "Łukasz Kwinta (lkwinta)", email = "lukaszmind@gmail.com"}
 ] 
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "torch",
     "opencv-python",
