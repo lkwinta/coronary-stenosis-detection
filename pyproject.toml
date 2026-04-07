@@ -28,7 +28,8 @@ dependencies = [
     "matplotlib",
     "scikit-image",
     "sknw",
-    "networkx"
+    "networkx",
+    "skan"
 ]
 
 [dependency-groups]
