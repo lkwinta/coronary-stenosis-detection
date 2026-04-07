@@ -31,6 +31,7 @@ dependencies = [
     "networkx",
     "optuna",
     "optuna-dashboard",
+    "skan"
 ]
 
 [dependency-groups]
