@@ -9,6 +9,194 @@ from segmentation_models_pytorch.encoders import get_encoder
 from coronary_analysis.models.unet import SimpleUNetDecoder
 
 
+class CoronaryDeeplabV3Plus(nn.Module):
+    """
+    DeepLabV3+ style segmentation model for coronary vessel segmentation.
+
+    This model is a custom implementation of the DeepLabV3+ architecture,
+    which features an encoder-decoder structure with atrous spatial pyramid pooling.
+
+    Parameters
+    ----------
+    encoder_name : str, optional
+        Name of the encoder backbone. Default is "resnet34".
+    encoder_weights : str | None, optional
+        Pretrained encoder weights, e.g. "imagenet". Default is "imagenet".
+
+    Notes
+    -----
+    Input shape:
+        [B, 1, H, W]
+    Output shape:
+        [B, 1, H, W] logits
+    """
+
+    def __init__(
+        self,
+        encoder_name: str = "resnet34",
+        encoder_weights: str | None = "imagenet",
+    ):
+        super().__init__()
+
+        self.model = smp.DeepLabV3Plus(
+            encoder_name=encoder_name,
+            encoder_weights=encoder_weights,
+            in_channels=1,
+            classes=1,
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Run the forward pass of the DeepLabV3+ model.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor of shape [B, 1, H, W].
+
+        Returns
+        -------
+        torch.Tensor
+            Raw segmentation logits of shape [B, 1, H, W].
+        """
+        return self.model(x)
+
+    @torch.no_grad()
+    def predict_proba(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Predict per-pixel vessel probabilities.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor of shape [B, 1, H, W].
+
+        Returns
+        -------
+        torch.Tensor
+            Probability map in [0, 1].
+        """
+        self.eval()
+        logits = self.forward(x)
+        return torch.sigmoid(logits)
+
+    @torch.no_grad()
+    def predict_mask(self, x: torch.Tensor, threshold: float = 0.5) -> torch.Tensor:
+        """
+        Predict a binary vessel mask.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor of shape [B, 1, H, W].
+        threshold : float, optional
+            Threshold applied to probabilities. Default is 0.5.
+
+        Returns
+        -------
+        torch.Tensor
+            Binary mask of shape [B, 1, H, W].
+        """
+        probs = self.predict_proba(x)
+        return (probs > threshold).float()
+
+
+class CoronaryUNetPP(nn.Module):
+    """
+    U-Net++ style segmentation model for coronary vessel segmentation.
+
+    This model is a custom implementation of the U-Net++ architecture,
+    which features nested skip connections and dense decoder blocks.
+
+    Parameters
+    ----------
+    encoder_name : str, optional
+        Name of the encoder backbone. Default is "resnet34".
+    encoder_weights : str | None, optional
+        Pretrained encoder weights, e.g. "imagenet". Default is "imagenet".
+    decoder_channels : Sequence[int], optional
+        Channel sizes for decoder stages. Default is (256, 128, 64, 32).
+    depth : int, optional
+        Encoder depth. Default is 5.
+
+    Notes
+    -----
+    Input shape:
+        [B, 1, H, W]
+    Output shape:
+        [B, 1, H, W] logits
+    """
+
+    def __init__(
+        self,
+        encoder_name: str = "resnet34",
+        encoder_weights: str | None = "imagenet",
+    ):
+        super().__init__()
+
+        self.model = smp.UnetPlusPlus(
+            encoder_name=encoder_name,
+            encoder_weights=encoder_weights,
+            in_channels=1,
+            classes=1,
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Run the forward pass of the U-Net++ model.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor of shape [B, 1, H, W].
+
+        Returns
+        -------
+        torch.Tensor
+            Raw segmentation logits of shape [B, 1, H, W].
+        """
+        return self.model(x)
+
+    @torch.no_grad()
+    def predict_proba(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Predict per-pixel vessel probabilities.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor of shape [B, 1, H, W].
+
+        Returns
+        -------
+        torch.Tensor
+            Probability map in [0, 1].
+        """
+        self.eval()
+        logits = self.forward(x)
+        return torch.sigmoid(logits)
+
+    @torch.no_grad()
+    def predict_mask(self, x: torch.Tensor, threshold: float = 0.5) -> torch.Tensor:
+        """
+        Predict a binary vessel mask.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor of shape [B, 1, H, W].
+        threshold : float, optional
+            Threshold applied to probabilities. Default is 0.5.
+
+        Returns
+        -------
+        torch.Tensor
+            Binary mask of shape [B, 1, H, W].
+        """
+        probs = self.predict_proba(x)
+        return (probs > threshold).float()
+
+
 class CoronaryUNet(nn.Module):
     """
     U-Net-based segmentation model for coronary angiography images.
@@ -210,6 +398,7 @@ class CoronaryUNetCustom(nn.Module):
         encoder_weights: str | None = "imagenet",
         decoder_channels: Sequence[int] = (256, 128, 64, 32),
         depth: int = 5,
+        dropout: float = 0.5,
     ):
         super().__init__()
 
@@ -223,6 +412,7 @@ class CoronaryUNetCustom(nn.Module):
         self.decoder = SimpleUNetDecoder(
             encoder_channels=self.encoder.out_channels,
             decoder_channels=decoder_channels,
+            dropout=dropout,
         )
 
         self.segmentation_head = SegmentationHead(

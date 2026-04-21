@@ -9,7 +9,7 @@ authors = [
 ]
 readme = "README.md"
 
-requires-python = "==3.11.*"
+requires-python = "==3.12.*"
 
 dependencies = [
     "numpy",
@@ -26,6 +26,8 @@ dependencies = [
     "scikit-learn",
     "coronary-analysis",
     "matplotlib",
+    "optuna",
+    "optuna-dashboard",
 ]
 
 [dependency-groups]
