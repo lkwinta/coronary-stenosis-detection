@@ -1,8 +1,6 @@
 import random
-
 import numpy as np
 import torch
-
 from .device import get_device
 
 
