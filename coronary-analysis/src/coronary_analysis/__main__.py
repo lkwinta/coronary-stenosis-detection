@@ -1,3 +1,5 @@
+from pathlib import Path
+from datetime import datetime
 from coronary_analysis.pipeline import run_analysis, generate_report
 
 import argparse
@@ -34,11 +36,15 @@ def main() -> None:
         min_object_size=args.min_object_size,
         min_branch_length=args.min_branch_length,
     )
-    report = generate_report(result, image_path=args.image, output_path=args.output)
     if args.output is None:
-        print(report)
-    if args.output is not None:
-        print(f"Report saved to {args.output}")
+        repo_root = Path(__file__).parent.parent.parent.parent
+        now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        output_path = repo_root / "raports" / f"report_{now}.md"
+    else:
+        output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    generate_report(result, image_path=args.image, output_path=output_path)
+    print(f"Report saved to {output_path}")
 
 
 if __name__ == "__main__":
