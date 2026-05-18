@@ -1,5 +1,9 @@
 from dataclasses import dataclass
 from pathlib import Path
+
+import numpy as np
+import torch
+
 from coronary_analysis.inference import (
     load_image,
     load_segmentation_model,
@@ -15,9 +19,12 @@ from coronary_analysis.topology import (
     estimate_branch_diameters,
 )
 from coronary_analysis.utils import get_device
-
-import numpy as np
-import torch
+from coronary_analysis.utils.junction_decision import (
+    JunctionDecision,
+    JunctionDecisionConfig,
+    JunctionDecisionResult,
+    run_junction_decision,
+)
 
 
 @dataclass
@@ -27,6 +34,14 @@ class AnalysisResult:
     skeleton: np.ndarray
     stats: dict
     branch_details: list[dict]
+
+    # Wynik decydowania przeniesiony z notebooka:
+    # certain = prawdziwy wierzchołek, false = crossing/overlap, not = brak sensownego kandydata.
+    junction_decision: JunctionDecisionResult
+    junction_groups: list[dict]
+    junction_results: list[JunctionDecision]
+    junction_counts: dict[str, int]
+    certain_junctions: list[JunctionDecision]
 
 
 def run_analysis(
@@ -40,6 +55,7 @@ def run_analysis(
     max_hole_size: int = 50,
     min_object_size: int = 50,
     min_branch_length: int = 15,
+    junction_config: JunctionDecisionConfig | None = None,
 ) -> AnalysisResult:
     if device is None:
         device = get_device()
@@ -62,8 +78,19 @@ def run_analysis(
     skel_obj, branch_data = build_vessel_graph(skeleton)
     stats = compute_topology_stats(branch_data)
     dist_map = compute_distance_map(mask)
-    branch_details = []
 
+    # Notebook-equivalent junction decision flow.
+    # Uses the already available image, cleaned mask, pruned skeleton and distance map,
+    # so the model/inference pipeline remains the single source of data.
+    junction_decision = run_junction_decision(
+        image=image,
+        mask_clean=mask,
+        skeleton=skeleton,
+        distance_map=dist_map,
+        config=junction_config,
+    )
+
+    branch_details = []
     for i in range(len(branch_data)):
         path = skel_obj.path_coordinates(i)
         diameters = estimate_branch_diameters(path, dist_map)
@@ -78,10 +105,25 @@ def run_analysis(
             }
         )
 
+    # Convenience copy in topology stats, useful for API/CLI output without walking dataclasses.
+    stats = {
+        **stats,
+        "junction_counts": junction_decision.counts,
+        "n_junction_groups": len(junction_decision.junction_groups),
+        "n_certain_junctions": junction_decision.counts["certain"],
+        "n_false_junctions": junction_decision.counts["false"],
+        "n_not_junctions": junction_decision.counts["not"],
+    }
+
     return AnalysisResult(
         image=image,
         mask=mask,
         skeleton=skeleton,
         stats=stats,
         branch_details=branch_details,
+        junction_decision=junction_decision,
+        junction_groups=junction_decision.junction_groups,
+        junction_results=junction_decision.decisions,
+        junction_counts=junction_decision.counts,
+        certain_junctions=junction_decision.certain,
     )
