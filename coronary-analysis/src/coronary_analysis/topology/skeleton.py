@@ -4,6 +4,9 @@ import cv2
 import numpy as np
 
 
+DIRECTIONS = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+
+
 def skeletonize_mask(mask: np.ndarray) -> np.ndarray:
     return skeletonize(mask.astype(bool)).astype(np.uint8)
 
@@ -28,25 +31,18 @@ def prune_skeleton(
 
             for _ in range(min_branch_length):
                 found = False
-                for dr in (-1, 0, 1):
-                    for dc in (-1, 0, 1):
-                        if dr == 0 and dc == 0:
-                            continue
+                for dr, dc in DIRECTIONS:
+                    nr, nc = cur_r + dr, cur_c + dc
 
-                        nr, nc = cur_r + dr, cur_c + dc
-
-                        if (
-                            0 <= nr < pruned.shape[0]
-                            and 0 <= nc < pruned.shape[1]
-                            and pruned[nr, nc]
-                            and (nr, nc) not in branch
-                        ):
-                            branch.append((nr, nc))
-                            cur_r, cur_c = nr, nc
-                            found = True
-                            break
-
-                    if found:
+                    if (
+                        0 <= nr < pruned.shape[0]
+                        and 0 <= nc < pruned.shape[1]
+                        and pruned[nr, nc]
+                        and (nr, nc) not in branch
+                    ):
+                        branch.append((nr, nc))
+                        cur_r, cur_c = nr, nc
+                        found = True
                         break
 
                 if not found:
