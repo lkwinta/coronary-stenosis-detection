@@ -80,6 +80,8 @@ def generate_report(
         branch_rows=branch_rows,
         **image_paths,
     )
+
     if output_path is not None:
         Path(output_path).write_text(report, encoding="utf-8")
+
     return report
