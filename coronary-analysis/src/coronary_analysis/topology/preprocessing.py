@@ -14,7 +14,7 @@ def clean_mask(
     if closing_radius > 0:
         binary = morphology.closing(binary, morphology.disk(closing_radius))
 
-    binary = morphology.remove_small_holes(binary, area_threshold=max_hole_size)
-    binary = morphology.remove_small_objects(binary, min_size=min_object_size)
+    binary = morphology.remove_small_holes(binary, max_size=max_hole_size)
+    binary = morphology.remove_small_objects(binary, max_size=min_object_size)
 
     return binary.astype(np.uint8)
