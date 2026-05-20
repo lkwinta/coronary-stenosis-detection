@@ -10,25 +10,25 @@ from coronary_analysis.inference import (
     predict_mask,
 )
 from coronary_analysis.topology import (
-    clean_mask,
-    skeletonize_mask,
-    prune_skeleton,
     build_vessel_graph,
-    compute_topology_stats,
+    clean_mask,
     compute_distance_map,
+    compute_topology_stats,
     estimate_branch_diameters,
+    prune_skeleton,
+    skeletonize_mask,
 )
-from coronary_analysis.utils import get_device
-from coronary_analysis.utils.junction_decision import (
+from coronary_analysis.topology.junction_decision import (
     JunctionDecision,
     JunctionDecisionConfig,
     JunctionDecisionResult,
     run_junction_decision,
 )
-
 from coronary_analysis.topology.junction_decision.graph_cleanup import (
     remove_false_junctions_from_skeleton,
 )
+from coronary_analysis.utils import get_device
+
 
 @dataclass
 class AnalysisResult:
@@ -62,21 +62,28 @@ def run_analysis(
 
     image = load_image(image_path)
     model = load_segmentation_model(
-        str(model_path), device=device, encoder_name=encoder_name
+        str(model_path),
+        device=device,
+        encoder_name=encoder_name,
     )
+
     mask = predict_mask(
-        image, model, device=device, img_size=img_size, threshold=threshold
+        image,
+        model,
+        device=device,
+        img_size=img_size,
+        threshold=threshold,
     )
+
     mask = clean_mask(
         mask,
         closing_radius=closing_radius,
         max_hole_size=max_hole_size,
         min_object_size=min_object_size,
     )
+
     skeleton = skeletonize_mask(mask)
     skeleton = prune_skeleton(skeleton, min_branch_length=min_branch_length)
-    skel_obj, branch_data = build_vessel_graph(skeleton)
-    stats = compute_topology_stats(branch_data)
     dist_map = compute_distance_map(mask)
 
     junction_decision = run_junction_decision(
@@ -87,15 +94,19 @@ def run_analysis(
         config=junction_config,
     )
 
-    skeleton, graph = remove_false_junctions_from_skeleton(
+    skeleton, _ = remove_false_junctions_from_skeleton(
         skeleton=skeleton,
         junction_decision=junction_decision,
     )
+
+    skel_obj, branch_data = build_vessel_graph(skeleton)
+    stats = compute_topology_stats(branch_data)
 
     branch_details = []
     for i in range(len(branch_data)):
         path = skel_obj.path_coordinates(i)
         diameters = estimate_branch_diameters(path, dist_map)
+
         branch_details.append(
             {
                 "branch_id": i,
