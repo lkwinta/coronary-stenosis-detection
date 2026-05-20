@@ -26,6 +26,9 @@ from coronary_analysis.utils.junction_decision import (
     run_junction_decision,
 )
 
+from coronary_analysis.topology.junction_decision.graph_cleanup import (
+    remove_false_junctions_from_skeleton,
+)
 
 @dataclass
 class AnalysisResult:
@@ -34,9 +37,6 @@ class AnalysisResult:
     skeleton: np.ndarray
     stats: dict
     branch_details: list[dict]
-
-    # Wynik decydowania przeniesiony z notebooka:
-    # certain = prawdziwy wierzchołek, false = crossing/overlap, not = brak sensownego kandydata.
     junction_decision: JunctionDecisionResult
     junction_groups: list[dict]
     junction_results: list[JunctionDecision]
@@ -79,15 +79,17 @@ def run_analysis(
     stats = compute_topology_stats(branch_data)
     dist_map = compute_distance_map(mask)
 
-    # Notebook-equivalent junction decision flow.
-    # Uses the already available image, cleaned mask, pruned skeleton and distance map,
-    # so the model/inference pipeline remains the single source of data.
     junction_decision = run_junction_decision(
         image=image,
         mask_clean=mask,
         skeleton=skeleton,
         distance_map=dist_map,
         config=junction_config,
+    )
+
+    skeleton, graph = remove_false_junctions_from_skeleton(
+        skeleton=skeleton,
+        junction_decision=junction_decision,
     )
 
     branch_details = []
@@ -105,7 +107,6 @@ def run_analysis(
             }
         )
 
-    # Convenience copy in topology stats, useful for API/CLI output without walking dataclasses.
     stats = {
         **stats,
         "junction_counts": junction_decision.counts,

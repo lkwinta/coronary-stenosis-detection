@@ -1,10 +1,12 @@
 from datetime import datetime
 from pathlib import Path
-from .analyze import AnalysisResult
-from coronary_analysis.topology import classify_skeleton_pixels
 
 import cv2
 import numpy as np
+
+from coronary_analysis.topology import classify_skeleton_pixels
+
+from .analyze import AnalysisResult
 
 
 TEMPLATE_PATH = Path(__file__).parent / "template.md"
@@ -39,6 +41,36 @@ def _save_visualizations(
     }
 
 
+def _format_label(label: object) -> str:
+    return str(getattr(label, "value", label))
+
+
+def _format_confidence(decision: object) -> str:
+    confidence = getattr(decision, "confidence", None)
+    if confidence is None:
+        return "-"
+    return f"{float(confidence):.3f}"
+
+
+def _format_junction_rows(result: AnalysisResult) -> str:
+    rows = []
+
+    for i, decision in enumerate(result.junction_results):
+        center = np.asarray(decision.center, dtype=float)
+
+        rows.append(
+            f"| {i} | "
+            f"({center[0]:.1f}, {center[1]:.1f}) | "
+            f"{_format_label(decision.label)} | "
+            f"{_format_confidence(decision)} |"
+        )
+
+    if not rows:
+        return "| - | - | - | - |"
+
+    return "\n".join(rows)
+
+
 def generate_report(
     result: AnalysisResult,
     image_path: str | Path,
@@ -59,11 +91,13 @@ def generate_report(
         }
 
     branch_rows = "\n".join(
-        f"| {b['branch_id']} | {b['length']:.1f} | {b['mean_diameter']:.1f} | {b['min_diameter']:.1f} | {b['max_diameter']:.1f} |"
+        f"| {b['branch_id']} | {b['length']:.1f} | {b['mean_diameter']:.1f} | "
+        f"{b['min_diameter']:.1f} | {b['max_diameter']:.1f} |"
         for b in result.branch_details
     )
 
     endpoints, _ = classify_skeleton_pixels(result.skeleton)
+    junction_rows = _format_junction_rows(result)
 
     report = template.format(
         image_name=Path(image_path).name,
@@ -78,6 +112,10 @@ def generate_report(
         vessel_coverage=f"{vessel_coverage:.2f}",
         num_endpoints=len(endpoints),
         branch_rows=branch_rows,
+        junction_rows=junction_rows,
+        n_certain_junctions=result.junction_counts.get("certain", 0),
+        n_false_junctions=result.junction_counts.get("false", 0),
+        n_not_junctions=result.junction_counts.get("not", 0),
         **image_paths,
     )
 
