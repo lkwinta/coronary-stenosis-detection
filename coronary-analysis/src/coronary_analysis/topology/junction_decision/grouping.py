@@ -20,7 +20,9 @@ def find_junction_groups(
     return groups, junction_mask
 
 
-def dilate_junction_pixels(junction_mask: np.ndarray, dilation_radius: int) -> np.ndarray:
+def dilate_junction_pixels(
+    junction_mask: np.ndarray, dilation_radius: int
+) -> np.ndarray:
     if dilation_radius <= 0:
         return junction_mask
     return ndi.binary_dilation(

@@ -56,7 +56,9 @@ def as_gray(image: np.ndarray) -> np.ndarray:
     raise ValueError(f"Expected 2D or 3D image array, got shape={array.shape!r}")
 
 
-def distance_map_or_default(distance_map: np.ndarray | None, mask: np.ndarray) -> np.ndarray:
+def distance_map_or_default(
+    distance_map: np.ndarray | None, mask: np.ndarray
+) -> np.ndarray:
     if distance_map is not None:
         return distance_map
     return ndi.distance_transform_edt(mask)
@@ -94,7 +96,9 @@ def classify_single_junction(
     config: JunctionDecisionConfig,
 ) -> JunctionDecision:
     arms = extract_initial_arms(skeleton, group, all_junction_pixel_mask, config)
-    decision_data = decide_label_from_arms(image_gray, group, group["center"], arms, distance_map, config)
+    decision_data = decide_label_from_arms(
+        image_gray, group, group["center"], arms, distance_map, config
+    )
     if should_refine_locally(decision_data[0], config):
         arms, decision_data, used_local_refine = apply_local_refine(
             image_gray,
@@ -138,7 +142,11 @@ def apply_local_refine(
     decision_data: tuple[JunctionLabel, dict[str, Any] | None, str, float, float],
     distance_map: np.ndarray | None,
     config: JunctionDecisionConfig,
-) -> tuple[list[dict[str, Any]], tuple[JunctionLabel, dict[str, Any] | None, str, float, float], bool]:
+) -> tuple[
+    list[dict[str, Any]],
+    tuple[JunctionLabel, dict[str, Any] | None, str, float, float],
+    bool,
+]:
     local_arms = refine_arms_locally(skeleton, group, config)
     local_decision_data = decide_label_from_arms(
         image_gray,
@@ -200,7 +208,9 @@ def decide_label_from_arms(
     config: JunctionDecisionConfig,
 ) -> tuple[JunctionLabel, dict[str, Any] | None, str, float, float]:
     thickness_mean, thickness_max = thickness_scores(distance_map, center, config)
-    fake_reason = classify_low_arm_count(len(arms), group, thickness_mean, thickness_max, config)
+    fake_reason = classify_low_arm_count(
+        len(arms), group, thickness_mean, thickness_max, config
+    )
     if fake_reason is not None:
         return fake_reason[0], None, fake_reason[1], thickness_mean, thickness_max
     best = best_pairing_cost(image_gray, arms, center)
@@ -237,7 +247,9 @@ def classify_low_arm_count(
     return JunctionLabel.NOT, "too_few_arms"
 
 
-def is_two_arm_fake(n_arms: int, group: dict[str, Any], config: JunctionDecisionConfig) -> bool:
+def is_two_arm_fake(
+    n_arms: int, group: dict[str, Any], config: JunctionDecisionConfig
+) -> bool:
     return (
         config.allow_two_arm_fake
         and n_arms == 2
@@ -276,7 +288,9 @@ def classify_pairing(
     return JunctionLabel.CERTAIN, "soft_certain"
 
 
-def is_good_false_pairing(n_arms: int, best: dict[str, Any], config: JunctionDecisionConfig) -> bool:
+def is_good_false_pairing(
+    n_arms: int, best: dict[str, Any], config: JunctionDecisionConfig
+) -> bool:
     return (
         n_arms >= 4
         and best["mean_cost"] <= config.fake_mean_cost_threshold
@@ -284,9 +298,13 @@ def is_good_false_pairing(n_arms: int, best: dict[str, Any], config: JunctionDec
     )
 
 
-def is_bad_certain_pairing(n_arms: int, best: dict[str, Any], config: JunctionDecisionConfig) -> bool:
+def is_bad_certain_pairing(
+    n_arms: int, best: dict[str, Any], config: JunctionDecisionConfig
+) -> bool:
     return n_arms >= 3 and best["mean_cost"] > config.fake_max_cost_threshold
 
 
-def is_soft_false_pairing(n_arms: int, best: dict[str, Any], config: JunctionDecisionConfig) -> bool:
+def is_soft_false_pairing(
+    n_arms: int, best: dict[str, Any], config: JunctionDecisionConfig
+) -> bool:
     return n_arms >= 4 and best["mean_cost"] <= config.fake_max_cost_threshold + 0.15

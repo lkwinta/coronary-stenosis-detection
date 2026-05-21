@@ -9,7 +9,10 @@ from typing import Any
 import numpy as np
 
 
-CONFIG_PATH = (Path(__file__).resolve().parents[2] / "configs" / "junction_decision_config.json")
+CONFIG_PATH = (
+    Path(__file__).resolve().parents[2] / "configs" / "junction_decision_config.json"
+)
+
 
 class JunctionLabel(str, Enum):
     CERTAIN = "certain"

@@ -40,10 +40,14 @@ def extract_arms_from_removed_region(
     starts, cut_skeleton = find_border_starts(skeleton, removed_region_mask)
     stop_mask = all_junction_pixel_mask.copy()
     stop_mask[removed_region_mask] = False
-    return build_arms(cut_skeleton, starts, stop_mask, max_arm_steps, min_arm_len, keep_short_arms)
+    return build_arms(
+        cut_skeleton, starts, stop_mask, max_arm_steps, min_arm_len, keep_short_arms
+    )
 
 
-def make_circular_mask(shape: tuple[int, int], center: np.ndarray, radius: int) -> np.ndarray:
+def make_circular_mask(
+    shape: tuple[int, int], center: np.ndarray, radius: int
+) -> np.ndarray:
     rows, cols = np.ogrid[: shape[0], : shape[1]]
     cy, cx = center
     return np.sqrt((rows - cy) ** 2 + (cols - cx) ** 2) <= radius
@@ -60,7 +64,9 @@ def find_border_starts(
     return starts, cut_skeleton
 
 
-def border_skeleton_pixels(cut_skeleton: np.ndarray, removed_region_mask: np.ndarray) -> np.ndarray:
+def border_skeleton_pixels(
+    cut_skeleton: np.ndarray, removed_region_mask: np.ndarray
+) -> np.ndarray:
     dilated_region = ndi.binary_dilation(
         removed_region_mask,
         structure=ndi.generate_binary_structure(2, 2),
@@ -127,7 +133,9 @@ def trace_arm(
     previous = None
     current = start
     for _ in range(max_steps):
-        candidates = next_arm_candidates(skeleton, current, previous, stop_junction_mask)
+        candidates = next_arm_candidates(
+            skeleton, current, previous, stop_junction_mask
+        )
         if not candidates:
             break
         next_point = choose_next_arm_point(candidates, current, previous)
@@ -166,7 +174,9 @@ def choose_next_arm_point(
     return min(candidates, key=lambda point: turn_cost(previous_vector, current, point))
 
 
-def turn_cost(previous_vector: np.ndarray, current: tuple[int, int], point: tuple[int, int]) -> float:
+def turn_cost(
+    previous_vector: np.ndarray, current: tuple[int, int], point: tuple[int, int]
+) -> float:
     next_vector = np.asarray(point) - np.asarray(current)
     return float(
         -np.dot(previous_vector, next_vector)

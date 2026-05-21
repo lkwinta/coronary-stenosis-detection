@@ -28,7 +28,9 @@ def compute_pair_costs(
 ) -> dict[tuple[int, int], float]:
     pair_costs: dict[tuple[int, int], float] = {}
     for first, second in combinations(range(len(arms)), 2):
-        pair_costs[(first, second)] = continuation_cost(image_gray, arms[first], arms[second], center)
+        pair_costs[(first, second)] = continuation_cost(
+            image_gray, arms[first], arms[second], center
+        )
     return pair_costs
 
 

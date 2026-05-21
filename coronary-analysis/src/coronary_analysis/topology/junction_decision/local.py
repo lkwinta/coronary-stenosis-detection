@@ -16,9 +16,13 @@ def refine_arms_locally(
     group: dict[str, Any],
     config: JunctionDecisionConfig,
 ) -> list[dict[str, Any]]:
-    y1, y2, x1, x2 = crop_bounds(group["center"], skeleton.shape, config.local_crop_size)
+    y1, y2, x1, x2 = crop_bounds(
+        group["center"], skeleton.shape, config.local_crop_size
+    )
     local_skeleton = skeleton[y1:y2, x1:x2].astype(np.uint8)
-    local_skeleton = prune_skeleton(local_skeleton, config.local_prune_min_branch_length).astype(bool)
+    local_skeleton = prune_skeleton(
+        local_skeleton, config.local_prune_min_branch_length
+    ).astype(bool)
     local_group = make_local_group(group, y1, x1)
     local_arms = extract_arms_for_group(
         skeleton=local_skeleton,
@@ -32,7 +36,9 @@ def refine_arms_locally(
     return to_global_arms(local_arms, y1, x1)
 
 
-def crop_bounds(center: np.ndarray, shape: tuple[int, int], size: int) -> tuple[int, int, int, int]:
+def crop_bounds(
+    center: np.ndarray, shape: tuple[int, int], size: int
+) -> tuple[int, int, int, int]:
     cy, cx = center
     cy = int(round(float(cy)))
     cx = int(round(float(cx)))
@@ -44,12 +50,18 @@ def crop_bounds(center: np.ndarray, shape: tuple[int, int], size: int) -> tuple[
     return y1, y2, x1, x2
 
 
-def make_local_group(group: dict[str, Any], y_offset: int, x_offset: int) -> dict[str, Any]:
-    local_center = np.asarray(group["center"], dtype=float) - np.array([y_offset, x_offset], dtype=float)
+def make_local_group(
+    group: dict[str, Any], y_offset: int, x_offset: int
+) -> dict[str, Any]:
+    local_center = np.asarray(group["center"], dtype=float) - np.array(
+        [y_offset, x_offset], dtype=float
+    )
     return {
         "id": group["id"],
         "center": local_center,
-        "pixels": np.array([[int(round(local_center[0])), int(round(local_center[1]))]]),
+        "pixels": np.array(
+            [[int(round(local_center[0])), int(round(local_center[1]))]]
+        ),
         "area": group.get("area", 1),
         "global_center": group["center"],
         "crop_offset": (y_offset, x_offset),
@@ -66,5 +78,7 @@ def to_global_arms(
         path = arm["path"].copy()
         path[:, 0] += y_offset
         path[:, 1] += x_offset
-        global_arms.append({**arm, "path": path, "start": tuple(path[0]), "source": "local"})
+        global_arms.append(
+            {**arm, "path": path, "start": tuple(path[0]), "source": "local"}
+        )
     return global_arms

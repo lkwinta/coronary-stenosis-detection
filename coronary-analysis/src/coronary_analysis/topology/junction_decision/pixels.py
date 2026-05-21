@@ -11,7 +11,9 @@ def in_bounds(row: int, col: int, shape: tuple[int, int]) -> bool:
     return 0 <= row < shape[0] and 0 <= col < shape[1]
 
 
-def iter_neighbors(row: int, col: int, shape: tuple[int, int]) -> Iterator[tuple[int, int]]:
+def iter_neighbors(
+    row: int, col: int, shape: tuple[int, int]
+) -> Iterator[tuple[int, int]]:
     for d_row, d_col in DIRECTIONS:
         n_row = row + d_row
         n_col = col + d_col
