@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, fields, is_dataclass
 from typing import Any
 
 import numpy as np
@@ -17,6 +18,18 @@ from .model import (
     JunctionLabel,
 )
 from .pairing import best_pairing_cost
+
+
+ArmData = dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class JunctionDecisionData:
+    label: JunctionLabel
+    best_pairing: dict[str, Any] | None
+    reason: str
+    thickness_mean: float
+    thickness_max: float
 
 
 def run_junction_decision(
@@ -72,19 +85,17 @@ def classify_junction_groups(
     distance_map: np.ndarray,
     config: JunctionDecisionConfig,
 ) -> list[JunctionDecision]:
-    decisions: list[JunctionDecision] = []
-    for group in groups:
-        decisions.append(
-            classify_single_junction(
-                image_gray,
-                skeleton,
-                group,
-                all_junction_pixel_mask,
-                distance_map,
-                config,
-            )
+    return [
+        classify_single_junction(
+            image_gray,
+            skeleton,
+            group,
+            all_junction_pixel_mask,
+            distance_map,
+            config,
         )
-    return decisions
+        for group in groups
+    ]
 
 
 def classify_single_junction(
@@ -99,7 +110,7 @@ def classify_single_junction(
     decision_data = decide_label_from_arms(
         image_gray, group, group["center"], arms, distance_map, config
     )
-    if should_refine_locally(decision_data[0], config):
+    if should_refine_locally(decision_data.label, config):
         arms, decision_data, used_local_refine = apply_local_refine(
             image_gray,
             skeleton,
@@ -119,8 +130,8 @@ def extract_initial_arms(
     group: dict[str, Any],
     all_junction_pixel_mask: np.ndarray,
     config: JunctionDecisionConfig,
-) -> list[dict[str, Any]]:
-    return extract_arms_for_group(
+) -> list[ArmData]:
+    arms = extract_arms_for_group(
         skeleton=skeleton,
         group=group,
         all_junction_pixel_mask=all_junction_pixel_mask,
@@ -128,6 +139,25 @@ def extract_initial_arms(
         max_arm_steps=config.max_arm_steps,
         min_arm_len=config.min_arm_len,
     )
+    return normalize_arms(arms)
+
+
+def normalize_arms(arms: list[Any]) -> list[ArmData]:
+    return [arm_to_dict(arm) for arm in arms]
+
+
+def arm_to_dict(arm: Any) -> ArmData:
+    if isinstance(arm, dict):
+        return arm
+
+    if is_dataclass(arm):
+        return {field.name: getattr(arm, field.name) for field in fields(arm)}
+
+    path = getattr(arm, "path", None)
+    if path is None:
+        raise TypeError(f"Expected arm with a path field, got {type(arm).__name__}")
+
+    return {"path": path}
 
 
 def should_refine_locally(label: JunctionLabel, config: JunctionDecisionConfig) -> bool:
@@ -138,16 +168,16 @@ def apply_local_refine(
     image_gray: np.ndarray,
     skeleton: np.ndarray,
     group: dict[str, Any],
-    arms: list[dict[str, Any]],
-    decision_data: tuple[JunctionLabel, dict[str, Any] | None, str, float, float],
+    arms: list[ArmData],
+    decision_data: JunctionDecisionData,
     distance_map: np.ndarray | None,
     config: JunctionDecisionConfig,
 ) -> tuple[
-    list[dict[str, Any]],
-    tuple[JunctionLabel, dict[str, Any] | None, str, float, float],
+    list[ArmData],
+    JunctionDecisionData,
     bool,
 ]:
-    local_arms = refine_arms_locally(skeleton, group, config)
+    local_arms = normalize_arms(refine_arms_locally(skeleton, group, config))
     local_decision_data = decide_label_from_arms(
         image_gray,
         group,
@@ -156,7 +186,7 @@ def apply_local_refine(
         distance_map,
         config,
     )
-    if local_decision_data[0] is not JunctionLabel.NOT:
+    if local_decision_data.label is not JunctionLabel.NOT:
         return local_arms, with_local_reason(local_decision_data), True
     if len(local_arms) > len(arms):
         return local_arms, with_reason(decision_data, "local_more_arms_but_not"), True
@@ -164,37 +194,46 @@ def apply_local_refine(
 
 
 def with_local_reason(
-    decision_data: tuple[JunctionLabel, dict[str, Any] | None, str, float, float],
-) -> tuple[JunctionLabel, dict[str, Any] | None, str, float, float]:
-    label, best, reason, thickness_mean, thickness_max = decision_data
-    return label, best, f"local_{reason}", thickness_mean, thickness_max
+    decision_data: JunctionDecisionData,
+) -> JunctionDecisionData:
+    return JunctionDecisionData(
+        label=decision_data.label,
+        best_pairing=decision_data.best_pairing,
+        reason=f"local_{decision_data.reason}",
+        thickness_mean=decision_data.thickness_mean,
+        thickness_max=decision_data.thickness_max,
+    )
 
 
 def with_reason(
-    decision_data: tuple[JunctionLabel, dict[str, Any] | None, str, float, float],
+    decision_data: JunctionDecisionData,
     reason: str,
-) -> tuple[JunctionLabel, dict[str, Any] | None, str, float, float]:
-    label, best, _, thickness_mean, thickness_max = decision_data
-    return label, best, reason, thickness_mean, thickness_max
+) -> JunctionDecisionData:
+    return JunctionDecisionData(
+        label=decision_data.label,
+        best_pairing=decision_data.best_pairing,
+        reason=reason,
+        thickness_mean=decision_data.thickness_mean,
+        thickness_max=decision_data.thickness_max,
+    )
 
 
 def build_decision(
     group: dict[str, Any],
-    arms: list[dict[str, Any]],
-    decision_data: tuple[JunctionLabel, dict[str, Any] | None, str, float, float],
+    arms: list[ArmData],
+    decision_data: JunctionDecisionData,
     used_local_refine: bool,
 ) -> JunctionDecision:
-    label, best, reason, thickness_mean, thickness_max = decision_data
     return JunctionDecision(
-        label=label,
-        reason=reason,
+        label=decision_data.label,
+        reason=decision_data.reason,
         center=group["center"],
         group=group,
         arms=arms,
         n_arms=len(arms),
-        best_pairing=best,
-        thickness_mean=thickness_mean,
-        thickness_max=thickness_max,
+        best_pairing=decision_data.best_pairing,
+        thickness_mean=decision_data.thickness_mean,
+        thickness_max=decision_data.thickness_max,
         used_local_refine=used_local_refine,
     )
 
@@ -203,21 +242,54 @@ def decide_label_from_arms(
     image_gray: np.ndarray,
     group: dict[str, Any],
     center: np.ndarray,
-    arms: list[dict[str, Any]],
+    arms: list[ArmData],
     distance_map: np.ndarray | None,
     config: JunctionDecisionConfig,
-) -> tuple[JunctionLabel, dict[str, Any] | None, str, float, float]:
+) -> JunctionDecisionData:
     thickness_mean, thickness_max = thickness_scores(distance_map, center, config)
     fake_reason = classify_low_arm_count(
         len(arms), group, thickness_mean, thickness_max, config
     )
     if fake_reason is not None:
-        return fake_reason[0], None, fake_reason[1], thickness_mean, thickness_max
-    best = best_pairing_cost(image_gray, arms, center)
+        return JunctionDecisionData(
+            label=fake_reason[0],
+            best_pairing=None,
+            reason=fake_reason[1],
+            thickness_mean=thickness_mean,
+            thickness_max=thickness_max,
+        )
+
+    if len(arms) > config.max_pairing_arms:
+        return JunctionDecisionData(
+            label=JunctionLabel.NOT,
+            best_pairing=None,
+            reason="too_many_arms_for_pairing",
+            thickness_mean=thickness_mean,
+            thickness_max=thickness_max,
+        )
+
+    best = best_pairing_cost(
+        image_gray,
+        arms,
+        center,
+        config.max_pairing_arms,
+    )
     if best is None:
-        return JunctionLabel.NOT, None, "no_pairing", thickness_mean, thickness_max
+        return JunctionDecisionData(
+            label=JunctionLabel.NOT,
+            best_pairing=None,
+            reason="no_pairing",
+            thickness_mean=thickness_mean,
+            thickness_max=thickness_max,
+        )
     label, reason = classify_pairing(len(arms), best, config)
-    return label, best, reason, thickness_mean, thickness_max
+    return JunctionDecisionData(
+        label=label,
+        best_pairing=best,
+        reason=reason,
+        thickness_mean=thickness_mean,
+        thickness_max=thickness_max,
+    )
 
 
 def thickness_scores(
@@ -270,7 +342,8 @@ def is_thickness_fake(
         return False
     return (
         thickness_mean >= config.thickness_fake_threshold
-        or thickness_max >= config.thickness_fake_threshold + 1.0
+        or thickness_max
+        >= config.thickness_fake_threshold + config.thickness_fake_max_extra
     )
 
 
@@ -307,4 +380,8 @@ def is_bad_certain_pairing(
 def is_soft_false_pairing(
     n_arms: int, best: dict[str, Any], config: JunctionDecisionConfig
 ) -> bool:
-    return n_arms >= 4 and best["mean_cost"] <= config.fake_max_cost_threshold + 0.15
+    return (
+        n_arms >= 4
+        and best["mean_cost"]
+        <= config.fake_max_cost_threshold + config.soft_false_mean_cost_extra
+    )

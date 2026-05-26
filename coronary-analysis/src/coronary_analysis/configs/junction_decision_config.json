@@ -18,5 +18,10 @@
   "enable_thickness_fake": true,
   "thickness_radius": 5,
   "thickness_fake_threshold": 2.0,
-  "thickness_area_threshold": 4
+  "thickness_area_threshold": 4,
+  "thickness_fake_max_extra": 1.0,
+  "soft_false_mean_cost_extra": 0.15,
+  "graph_cleanup_neighbor_score_threshold": 0.3,
+  "max_pairing_arms": 8,
+  "graph_cleanup_max_center_distance": 8.0
 }

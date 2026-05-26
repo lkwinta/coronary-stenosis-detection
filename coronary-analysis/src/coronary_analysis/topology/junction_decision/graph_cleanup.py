@@ -6,85 +6,48 @@ import networkx as nx
 import numpy as np
 
 from coronary_analysis.topology.junction_decision.model import (
+    DEFAULT_JUNCTION_DECISION_CONFIG,
+    JunctionDecision,
+    JunctionDecisionConfig,
     JunctionDecisionResult,
     JunctionLabel,
 )
-from coronary_analysis.topology.skeleton import DIRECTIONS
-
-
-PixelNode = tuple[int, int]
-PixelPair = tuple[PixelNode, PixelNode]
+from coronary_analysis.topology.pixel_graph import (
+    PixelNode,
+    PixelPair,
+    build_skeleton_pixel_graph,
+    pixel_graph_to_skeleton,
+)
 
 
 def remove_false_junctions_from_skeleton(
     skeleton: np.ndarray,
     junction_decision: JunctionDecisionResult,
     *,
-    max_center_distance: float = 8.0,
+    config: JunctionDecisionConfig = DEFAULT_JUNCTION_DECISION_CONFIG,
 ) -> tuple[np.ndarray, nx.Graph]:
-    graph = _build_skeleton_graph(skeleton)
+    graph = build_skeleton_pixel_graph(skeleton)
 
     for decision in junction_decision.decisions:
-        if _label_value(decision.label) != JunctionLabel.FALSE.value:
+        if decision.label is not JunctionLabel.FALSE:
             continue
 
-        node = _find_nearest_node(graph, decision.center, max_center_distance)
+        node = _find_nearest_node(
+            graph,
+            decision.center,
+            config.graph_cleanup_max_center_distance,
+        )
         if node is None:
             continue
 
         neighbors = list(graph.neighbors(node))
         if len(neighbors) >= 2:
-            pairs = _neighbor_pairs(node, neighbors, decision)
+            pairs = _neighbor_pairs(node, neighbors, decision, config)
             _connect_pairs(graph, node, pairs)
 
         graph.remove_node(node)
 
-    return _graph_to_skeleton(graph, skeleton.shape), graph
-
-
-def _build_skeleton_graph(skeleton: np.ndarray) -> nx.Graph:
-    skeleton = skeleton.astype(bool)
-    graph = nx.Graph()
-
-    rows, cols = np.nonzero(skeleton)
-    for row, col in zip(rows, cols, strict=True):
-        graph.add_node((int(row), int(col)))
-
-    for row, col in list(graph.nodes):
-        for d_row, d_col in DIRECTIONS:
-            neighbor = (row + d_row, col + d_col)
-            if neighbor not in graph or graph.has_edge((row, col), neighbor):
-                continue
-
-            length = float(np.hypot(d_row, d_col))
-            graph.add_edge(
-                (row, col),
-                neighbor,
-                length=length,
-                weight=length,
-                path=np.asarray([(row, col), neighbor], dtype=int),
-            )
-
-    return graph
-
-
-def _graph_to_skeleton(graph: nx.Graph, shape: tuple[int, int]) -> np.ndarray:
-    skeleton = np.zeros(shape, dtype=bool)
-
-    for row, col in graph.nodes:
-        if 0 <= row < shape[0] and 0 <= col < shape[1]:
-            skeleton[row, col] = True
-
-    for _, _, attrs in graph.edges(data=True):
-        path = attrs.get("path")
-        if path is None:
-            continue
-
-        for row, col in np.asarray(path, dtype=int):
-            if 0 <= row < shape[0] and 0 <= col < shape[1]:
-                skeleton[row, col] = True
-
-    return skeleton
+    return pixel_graph_to_skeleton(graph, skeleton.shape), graph
 
 
 def _find_nearest_node(
@@ -112,9 +75,10 @@ def _find_nearest_node(
 def _neighbor_pairs(
     node: PixelNode,
     neighbors: list[PixelNode],
-    decision: Any,
+    decision: JunctionDecision,
+    config: JunctionDecisionConfig,
 ) -> list[PixelPair]:
-    pairs = _pairs_from_best_pairing(neighbors, decision)
+    pairs = _pairs_from_best_pairing(neighbors, decision, config)
     if pairs:
         return pairs
 
@@ -123,13 +87,14 @@ def _neighbor_pairs(
 
 def _pairs_from_best_pairing(
     neighbors: list[PixelNode],
-    decision: Any,
+    decision: JunctionDecision,
+    config: JunctionDecisionConfig,
 ) -> list[PixelPair]:
-    best_pairing = getattr(decision, "best_pairing", None)
+    best_pairing = decision.best_pairing
     if not best_pairing or "pairs" not in best_pairing:
         return []
 
-    arm_to_neighbor = _map_arms_to_neighbors(neighbors, decision)
+    arm_to_neighbor = _map_arms_to_neighbors(neighbors, decision, config)
 
     pairs: list[PixelPair] = []
     used: set[PixelNode] = set()
@@ -154,13 +119,14 @@ def _pairs_from_best_pairing(
 
 def _map_arms_to_neighbors(
     neighbors: list[PixelNode],
-    decision: Any,
+    decision: JunctionDecision,
+    config: JunctionDecisionConfig,
 ) -> dict[int, PixelNode]:
     center = np.asarray(decision.center, dtype=float)
     mapping: dict[int, PixelNode] = {}
     used_neighbors: set[PixelNode] = set()
 
-    for arm_index, arm in enumerate(getattr(decision, "arms", [])):
+    for arm_index, arm in enumerate(decision.arms):
         arm_direction = _arm_direction(arm, center)
         if arm_direction is None:
             continue
@@ -179,7 +145,10 @@ def _map_arms_to_neighbors(
                 best_neighbor = neighbor
                 best_score = score
 
-        if best_neighbor is not None and best_score > 0.3:
+        if (
+            best_neighbor is not None
+            and best_score > config.graph_cleanup_neighbor_score_threshold
+        ):
             mapping[arm_index] = best_neighbor
             used_neighbors.add(best_neighbor)
 
@@ -258,10 +227,6 @@ def _path_length(path: np.ndarray) -> float:
 
     diffs = np.diff(path.astype(float), axis=0)
     return float(np.linalg.norm(diffs, axis=1).sum())
-
-
-def _label_value(label: Any) -> str:
-    return getattr(label, "value", label)
 
 
 def _normalize(vector: np.ndarray) -> np.ndarray:

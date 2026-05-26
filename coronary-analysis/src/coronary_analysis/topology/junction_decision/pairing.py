@@ -13,9 +13,13 @@ def best_pairing_cost(
     image_gray: np.ndarray,
     arms: list[dict[str, Any]],
     center: np.ndarray,
+    max_pairing_arms: int = 8,
 ) -> dict[str, Any] | None:
     if len(arms) < 2:
         return None
+    if len(arms) > max_pairing_arms:
+        return None
+
     pair_costs = compute_pair_costs(image_gray, arms, center)
     candidate_pairings = list(candidate_arm_pairings(len(arms)))
     return select_best_pairing(pair_costs, candidate_pairings)

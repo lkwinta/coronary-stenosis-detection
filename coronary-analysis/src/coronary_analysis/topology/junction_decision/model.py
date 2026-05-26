@@ -41,7 +41,12 @@ class JunctionDecisionConfig:
     enable_thickness_fake: bool
     thickness_radius: int
     thickness_fake_threshold: float
+    thickness_fake_max_extra: float
     thickness_area_threshold: int
+    soft_false_mean_cost_extra: float
+    graph_cleanup_neighbor_score_threshold: float
+    max_pairing_arms: int
+    graph_cleanup_max_center_distance: float
 
     @property
     def enable_local_reskeleton(self) -> bool:

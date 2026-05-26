@@ -19,6 +19,7 @@ from coronary_analysis.topology import (
     skeletonize_mask,
 )
 from coronary_analysis.topology.junction_decision import (
+    DEFAULT_JUNCTION_DECISION_CONFIG,
     JunctionDecision,
     JunctionDecisionConfig,
     JunctionDecisionResult,
@@ -60,6 +61,9 @@ def run_analysis(
     if device is None:
         device = get_device()
 
+    if junction_config is None:
+        junction_config = DEFAULT_JUNCTION_DECISION_CONFIG
+
     image = load_image(image_path)
     model = load_segmentation_model(
         str(model_path),
@@ -97,6 +101,7 @@ def run_analysis(
     skeleton, _ = remove_false_junctions_from_skeleton(
         skeleton=skeleton,
         junction_decision=junction_decision,
+        config=junction_config,
     )
 
     skel_obj, branch_data = build_vessel_graph(skeleton)
