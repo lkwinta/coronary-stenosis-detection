@@ -34,6 +34,16 @@
 |---|---|---|---|---|
 {branch_rows}
 
+## Klasyfikacja wierzchołków
+
+- Pewne rozgałęzienia: {n_certain_junctions}
+- Fałszywe rozgałęzienia: {n_false_junctions}
+- Nie-rozgałęzienia: {n_not_junctions}
+
+| ID | Środek (row, col) | Klasyfikacja | Confidence |
+|---:|---|---|---:|
+{junction_rows}
+
 ---
 
 *Raport wygenerowany automatycznie przez coronary_analysis*
