@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 
 from coronary_analysis.topology import classify_skeleton_pixels
+from coronary_analysis.topology.junction_decision import JunctionDecision
 
 from .analyze import AnalysisResult
 
@@ -41,27 +42,20 @@ def _save_visualizations(
     }
 
 
-def _format_label(label: object) -> str:
-    return str(getattr(label, "value", label))
+def _format_confidence(decision: JunctionDecision) -> str:
+    return "-"
 
 
-def _format_confidence(decision: object) -> str:
-    confidence = getattr(decision, "confidence", None)
-    if confidence is None:
-        return "-"
-    return f"{float(confidence):.3f}"
-
-
-def _format_junction_rows(result: AnalysisResult) -> str:
+def _format_junction_rows(junction_results: list[JunctionDecision]) -> str:
     rows = []
 
-    for i, decision in enumerate(result.junction_results):
-        center = np.asarray(decision.center, dtype=float)
+    for i, decision in enumerate(junction_results):
+        center_y, center_x = decision.center
 
         rows.append(
             f"| {i} | "
-            f"({center[0]:.1f}, {center[1]:.1f}) | "
-            f"{_format_label(decision.label)} | "
+            f"({float(center_y):.1f}, {float(center_x):.1f}) | "
+            f"{decision.label.value} | "
             f"{_format_confidence(decision)} |"
         )
 
@@ -97,7 +91,7 @@ def generate_report(
     )
 
     endpoints, _ = classify_skeleton_pixels(result.skeleton)
-    junction_rows = _format_junction_rows(result)
+    junction_rows = _format_junction_rows(result.junction_results)
 
     report = template.format(
         image_name=Path(image_path).name,

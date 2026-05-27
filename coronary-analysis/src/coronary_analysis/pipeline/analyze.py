@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -23,12 +23,27 @@ from coronary_analysis.topology.junction_decision import (
     JunctionDecision,
     JunctionDecisionConfig,
     JunctionDecisionResult,
+    JunctionLabel,
     run_junction_decision,
 )
 from coronary_analysis.topology.junction_decision.graph_cleanup import (
     remove_false_junctions_from_skeleton,
 )
 from coronary_analysis.utils import get_device
+
+
+@dataclass(frozen=True)
+class AnalysisConfig:
+    encoder_name: str = "resnet34"
+    img_size: int = 256
+    threshold: float = 0.5
+    closing_radius: float = 2
+    max_hole_size: int = 50
+    min_object_size: int = 50
+    min_branch_length: int = 15
+    junction_config: JunctionDecisionConfig = field(
+        default_factory=lambda: DEFAULT_JUNCTION_DECISION_CONFIG
+    )
 
 
 @dataclass
@@ -39,55 +54,59 @@ class AnalysisResult:
     stats: dict
     branch_details: list[dict]
     junction_decision: JunctionDecisionResult
-    junction_groups: list[dict]
-    junction_results: list[JunctionDecision]
-    junction_counts: dict[str, int]
-    certain_junctions: list[JunctionDecision]
+
+    @property
+    def junction_groups(self) -> list[dict]:
+        return self.junction_decision.junction_groups
+
+    @property
+    def junction_results(self) -> list[JunctionDecision]:
+        return self.junction_decision.decisions
+
+    @property
+    def junction_counts(self) -> dict[str, int]:
+        return self.junction_decision.counts
+
+    @property
+    def certain_junctions(self) -> list[JunctionDecision]:
+        return self.junction_decision.certain
 
 
 def run_analysis(
     image_path: str | Path,
     model_path: str | Path,
     device: torch.device | None = None,
-    encoder_name: str = "resnet34",
-    img_size: int = 256,
-    threshold: float = 0.5,
-    closing_radius: float = 2,
-    max_hole_size: int = 50,
-    min_object_size: int = 50,
-    min_branch_length: int = 15,
-    junction_config: JunctionDecisionConfig | None = None,
+    config: AnalysisConfig | None = None,
 ) -> AnalysisResult:
     if device is None:
         device = get_device()
 
-    if junction_config is None:
-        junction_config = DEFAULT_JUNCTION_DECISION_CONFIG
+    config = config or AnalysisConfig()
 
     image = load_image(image_path)
     model = load_segmentation_model(
         str(model_path),
         device=device,
-        encoder_name=encoder_name,
+        encoder_name=config.encoder_name,
     )
 
     mask = predict_mask(
         image,
         model,
         device=device,
-        img_size=img_size,
-        threshold=threshold,
+        img_size=config.img_size,
+        threshold=config.threshold,
     )
 
     mask = clean_mask(
         mask,
-        closing_radius=closing_radius,
-        max_hole_size=max_hole_size,
-        min_object_size=min_object_size,
+        closing_radius=config.closing_radius,
+        max_hole_size=config.max_hole_size,
+        min_object_size=config.min_object_size,
     )
 
     skeleton = skeletonize_mask(mask)
-    skeleton = prune_skeleton(skeleton, min_branch_length=min_branch_length)
+    skeleton = prune_skeleton(skeleton, min_branch_length=config.min_branch_length)
     dist_map = compute_distance_map(mask)
 
     junction_decision = run_junction_decision(
@@ -95,13 +114,13 @@ def run_analysis(
         mask_clean=mask,
         skeleton=skeleton,
         distance_map=dist_map,
-        config=junction_config,
+        config=config.junction_config,
     )
 
     skeleton, _ = remove_false_junctions_from_skeleton(
         skeleton=skeleton,
         junction_decision=junction_decision,
-        config=junction_config,
+        config=config.junction_config,
     )
 
     skel_obj, branch_data = build_vessel_graph(skeleton)
@@ -127,9 +146,9 @@ def run_analysis(
         **stats,
         "junction_counts": junction_decision.counts,
         "n_junction_groups": len(junction_decision.junction_groups),
-        "n_certain_junctions": junction_decision.counts["certain"],
-        "n_false_junctions": junction_decision.counts["false"],
-        "n_not_junctions": junction_decision.counts["not"],
+        "n_certain_junctions": junction_decision.counts[JunctionLabel.CERTAIN.value],
+        "n_false_junctions": junction_decision.counts[JunctionLabel.FALSE.value],
+        "n_not_junctions": junction_decision.counts[JunctionLabel.NOT.value],
     }
 
     return AnalysisResult(
@@ -139,8 +158,4 @@ def run_analysis(
         stats=stats,
         branch_details=branch_details,
         junction_decision=junction_decision,
-        junction_groups=junction_decision.junction_groups,
-        junction_results=junction_decision.decisions,
-        junction_counts=junction_decision.counts,
-        certain_junctions=junction_decision.certain,
     )
