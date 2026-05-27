@@ -42,7 +42,7 @@ def _save_visualizations(
     }
 
 
-def _format_confidence(decision: JunctionDecision) -> str:
+def _format_confidence() -> str:
     return "-"
 
 
