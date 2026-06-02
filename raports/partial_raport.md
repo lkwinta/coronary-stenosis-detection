@@ -2,7 +2,7 @@
 
 # Cel projektu
 
-Celem projektu jest przygotowanie narzędzia które z obrazu angiografii wieńcowej wyznacza strukturę naczyń, opisuje ją geometrycznie i na tej podstawie wskazuje miejsca potencjalnych zmian. Samo narzędzie zaplanowaliśmy jako wiele kroków przetwarzania, które po kolei prowadzą do ostatecznej analizy zmian.
+Celem projektu jest przygotowanie narzędzia, które z obrazu angiografii wieńcowej wyznacza strukturę naczyń, opisuje ją geometrycznie i na tej podstawie wskazuje miejsca potencjalnych zmian. Samo narzędzie zaplanowaliśmy jako wiele kroków przetwarzania, które po kolei prowadzą do ostatecznej analizy zmian.
 
 # Plan realizacji
 
@@ -18,7 +18,7 @@ Najpierw obraz jest normalizowany i przekazywany do modelu segmentacyjnego. Mode
 
 # Dane
 
-Do treningu modeli wykorzystaliśmy kilka zbiorów danych. Jako podstawowy zbiór do segmentacji, posłużył nam DCA1, czyli baza 134 angiogramów wieńcowych z ręcznie oznaczonymi maskami naczyń [2].  Istotną wadą tego zbioru jest jego licznosć, przez co nie mogliśmy znacząco dopracować segmentacji.
+Do treningu modeli wykorzystaliśmy kilka zbiorów danych. Jako podstawowy zbiór do segmentacji, posłużył nam DCA1, czyli baza 134 angiogramów wieńcowych z ręcznie oznaczonymi maskami naczyń [2].  Istotną wadą tego zbioru jest jego liczność, przez co nie mogliśmy znacząco dopracować segmentacji.
 
 Wspomogliśmy się też zbiorem danych FS-CAD [3], który zawiera dodatkowe 40 masek angiograficznych.
 
@@ -27,8 +27,8 @@ Wspomogliśmy się też zbiorem danych FS-CAD [3], który zawiera dodatkowe 40 m
 ![Przykład FS-CAD](imgs/dataset_fs_cad_example.png)
 
 Dla poprawy wyników wykorzystaliśmy też pretrening modelu segmentacyjnego na zbiorze ARCADE Syntax [1]. Zbiór ten nie zapewnia co prawda dokładnych masek, 
-ale zawiera adnotacje fragmentów naczyń podzielone na różny wynik SYNTAX Score. Zbinaryzowaliśmy te adnotacje, tworząc zgrubsze maski potrafiajace nauczyć 
-model podstawoej struktury naczyń.
+ale zawiera adnotacje fragmentów naczyń podzielone na różny wynik SYNTAX Score. Zbinaryzowaliśmy te adnotacje, tworząc zgrubsze maski potrafiące nauczyć 
+model podstawowej struktury naczyń.
 
 ![Przykład binarnego ARCADE Syntax](imgs/arcade_syntax_binary_example.png)
 
@@ -38,44 +38,44 @@ Do dalszej detekcji zmian wykorzystujemy też ARCADE stenosis, ponieważ zawiera
 
 # Segmentacja
 
-Pierwsze eksperymenty z segmentacją wypadały miernie, z DICE na poziomie `0.75`. Największy problem stanowiła duża fragmentacja maski segmentacyjnej. Z tego powodu zdecydowaliśmy się na tunning hiperparametrów przy użyciu biblioteki `optuna`.
+Pierwsze eksperymenty z segmentacją wypadały niezadowalająco z DICE na poziomie `0.75`. Największym problemem była duża fragmentacja maski segmentacyjnej, więc zdecydowaliśmy się na tuning hiperparametrów przy użyciu biblioteki `optuna`. Dzięki automatycznemu przeszukiwaniu przestrzeni hiperparametrów przez Optunę udało się podnieść DICE z początkowych 0.75 do 0.81 na zbiorze walidacyjnym, bez ręcznego dobierania konfiguracji treningowej.
 
-Segmentację trenowaliśmy na kilku wariantach modeli, między innymi U-Net, U-Net++ i DeepLabV3+.
+Segmentację trenowaliśmy na kilku wariantach modeli, między innymi `U-Net`, `U-Net++` i `DeepLabV3+`.
 
-Najlepszy wynik na zbiorze wlidacyjnym uzyskał model U-Net++, trenowany na obrazach `256 x 256`, z optymalizatorem `AdamW` i schedulerem `ReduceLROnPlateau` - `dice=0.81`.
+Najlepszy wynik na zbiorze walidacyjnym uzyskał model `U-Net++`, trenowany na obrazach `256 x 256`, z optymalizatorem `AdamW` i schedulerem `ReduceLROnPlateau` - `dice=0.81`.
 
 ![Wyniki optymalizacji Optuny](imgs/optuna_results.png)
 
-Uznaliśmy że obecny efekt jest wystarczający i nie poprawimy go już więcej mając do dyspozycji tak maly zbiór danych. Próbowaliśmy też stosować większe modele, ale one z kolei bardzo szybko przeuczały.
+Uznaliśmy, że obecny efekt jest wystarczający, biorąc pod uwagę jak niewielki zbiór danych mieliśmy do dyspozycji. Próbowaliśmy też stosować większe modele, ale one z kolei bardzo szybko przeuczały.
 
 ![Ważność hiperparametrów Optuny](imgs/importance.png)
 
-Najlepszy model na danych testowych - które nie były użyte ani do treningu ani do tunningu hiperparametrów uzyskał wyniki:
+Najlepszy model na danych testowych - które nie były użyte ani do treningu, ani do tuningu hiperparametrów - uzyskał wyniki:
 
 * Test Dice: `0.7924`
 * Test IoU: `0.6563`
 * Test Loss: `0.1489`
 
-Do częsciowego rozwiązania problemu z ciągłością maski segmentacji zastosowaliśmy loss w postaci połączenia binarnej entropii krzyżowej i metryki clDICE, która na podstawie szkieletyzacji określa spójność segmentacji.
+Do częściowego rozwiązania problemu z ciągłością maski segmentacji zastosowaliśmy loss w postaci połączenia binarnej entropii krzyżowej i metryki `clDICE`, która na podstawie szkieletyzacji określa spójność segmentacji.
 
 Poniżej przykładowy wynik segmentacji ze zbioru testowego.
 ![Przykładowy wynik testowy](imgs/example_segmentation_finetune.png)
 
 # Szkieletyzacja
 
-Skeletonizacja zamienia maskę naczynia na linię centralną. Jest to kluczowy etap, bo pozwala przejść z obrazu pikselowego do struktury, którą można analizować jak graf.
+Szkieletyzacja zamienia maskę naczynia na linię centralną. Jest to kluczowy etap, bo pozwala przejść z obrazu pikselowego do struktury, którą można analizować jak graf.
 
 Poniżej znajduje się przykład wejścia do tego etapu. Po lewej jest obraz angiograficzny, a po prawej odpowiadająca mu maska.
 
-![Wejście do skeletonizacji](imgs/skeletonize_input_mask.png)
+![Wejście do szkieletyzacji](imgs/skeletonize_input_mask.png)
 
-Po oczyszczeniu maski wykonywana jest skeletonizacja. Czerwona linia pokazuje wyznaczoną linię centralną naczynia.
+Po oczyszczeniu maski wykonywana jest szkieletyzacja. Czerwona linia pokazuje wyznaczoną linię centralną naczynia.
 
-![Skeletonizacja i overlay](imgs/skeletonize_overlay.png)
+![Szkieletyzacja i overlay](imgs/skeletonize_overlay.png)
 
-Sama skeletonizacja generuje też krótkie, niepożądane odnogi. Część z nich powstaje przez drobne nierówności maski. Dlatego dodaliśmy pruning krótkich fragmentów.
+Sam proces szkieletyzacji generuje też krótkie, niepożądane odnogi. Część z nich powstaje przez drobne nierówności maski. Dlatego dodaliśmy pruning krótkich fragmentów.
 
-![Pruning skeletonu](imgs/skeletonize_pruning.png)
+![Pruning szkieletu](imgs/skeletonize_pruning.png)
 
 Po pruningu dla analizowanego przykładu otrzymaliśmy graf z pięcioma gałęziami.
 
@@ -97,15 +97,15 @@ Ta informacja jest szczególnie ważna dla dalszej detekcji stenoz. Zwężenie p
 
 # Wykrywanie bifurkacji
 
-Bifurkacje są jednym z trudniejszych elementów. W obrazie 2D naczynia mogą się nakładać. W masce takie miejsce może wyglądać jak prawdziwe rozgałęzienie, mimo że jest tylko przecięciem projekcji.
+Wykrywanie bifurkacji jest jednym z trudniejszych wyzwań w tym projekcie, ponieważ w obrazie 2D naczynia mogą się nakładać. W masce takie miejsce może wyglądać jak prawdziwe rozgałęzienie, mimo że jest tylko przecięciem projekcji.
 
-Dlatego dodaliśmy mechanizm klasyfikacji junctionów. Każde podejrzane miejsce jest przypisywane do jednej z trzech grup:
+Dlatego dodaliśmy mechanizm klasyfikacji węzłów rozgałęzień. Każde podejrzane miejsce jest przypisywane do jednej z trzech grup:
 
 * `certain`, czyli prawdopodobna prawdziwa bifurkacja,
 * `false`, czyli prawdopodobne fałszywe rozgałęzienie,
 * `not`, czyli brak pewnej decyzji.
 
-Klasyfikacja korzysta z ramion wychodzących z danego junctionu. Jeżeli ramiona dobrze układają się w kontynuacje jednego naczynia, punkt może zostać uznany za fałszywy. Jeżeli układ ramion wygląda jak rzeczywiste rozgałęzienie, punkt zostaje oznaczony jako `certain`.
+Klasyfikacja korzysta z ramion wychodzących z danego rozgałęzienia. Jeżeli ramiona dobrze układają się w kontynuację jednego naczynia, punkt może zostać uznany za fałszywy. Jeżeli układ ramion wygląda jak rzeczywiste rozgałęzienie, punkt zostaje oznaczony jako `certain`.
 
 ![Junction decision - sample 86](imgs/junction_decision_sample_86.png)
 
@@ -113,7 +113,7 @@ Klasyfikacja korzysta z ramion wychodzących z danego junctionu. Jeżeli ramiona
 
 ![Junction decision - sample 47](imgs/junction_decision_sample_47.png)
 
-Dla batcha 10 losowych próbek z DCA1 otrzymaliśmy:
+Dla zestawu 10 losowych próbek ze zbioru DCA1 otrzymaliśmy:
 
 | sample_id | certain | false | not | total |
 |---:|---:|---:|---:|---:|
@@ -138,11 +138,11 @@ Samej klasyfikacji zmian dokonujemy na podstawie grafu z poprzedniego etapu. Dzi
 
 ![Segmentacja grafu](imgs/xgboost/segments.png)
 
-Następnie dane tablerayczne klasyfikujemy modelem XGBoost. Obecnie przeprowadziliśmy dopiero pierwsze eksperymenty i jakość modelu nie jest jeszcze zadowalająca.
+Następnie dane tabelaryczne klasyfikujemy modelem `XGBoost`. Obecnie przeprowadziliśmy dopiero pierwsze eksperymenty i jakość modelu nie jest jeszcze zadowalająca.
 
 ![Macierz konfuzji](imgs/xgboost/xgboost_confusion_matrix.png)
 
-W danych tabelarycznych zapisujemy poniższe cechy
+W danych tabelarycznych zapisujemy poniższe cechy:
 ![Ważność cech](imgs/xgboost/feature_importance.png)
 
 Poniżej przykład klasyfikacji odcinka:
@@ -160,10 +160,9 @@ W raporcie mogą znaleźć się między innymi:
 * średnie, minimalne i maksymalne średnice,
 * liczba wykrytych bifurkacji jak i ich klasyfikacja
 
-Jedyny brakujący element to wpięcie do tego modułu określającego same zmiany miażdżycowe.
+Jedynym brakującym elementem jest wpięcie modułu klasyfikującego zmiany miażdżycowe do procesu generowania raportu. 
 
-
-# Cytowania
+# Bibliografia
 
 [1] ARCADE: Dataset for Automatic Region-based Coronary Artery Disease Diagnostics Using X-Ray Angiography Images, Scientific Data, 2023. https://www.nature.com/articles/s41597-023-02871-z
 
