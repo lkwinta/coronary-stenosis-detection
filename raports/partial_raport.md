@@ -132,6 +132,22 @@ Dla batcha 10 losowych próbek z DCA1 otrzymaliśmy:
 
 Wizualnie wyniki są sensowne, ale nadal jest to ocena jakościowa. Nie mamy jeszcze ręcznie oznaczonego zbioru prawdziwych i fałszywych bifurkacji. Z tego powodu nie można uczciwie podać precision ani recall dla tego etapu.
 
+# Klasyfikacja zmian naczyniowych
+
+Samej klasyfikacji zmian dokonujemy na podstawie grafu z poprzedniego etapu. Dzielimy graf na odcinki, i tworzymy rekordy tabelaryczne opisujące średnicę naczynia na danych odcinkach fragmentu grafu.
+
+![Segmentacja grafu](imgs/xgboost/segments.png)
+
+Następnie dane tablerayczne klasyfikujemy modelem XGBoost. Obecnie przeprowadziliśmy dopiero pierwsze eksperymenty i jakość modelu nie jest jeszcze zadowalająca.
+
+![Macierz konfuzji](imgs/xgboost/xgboost_confusion_matrix.png)
+
+W danych tabelarycznych zapisujemy poniższe cechy
+![Ważność cech](imgs/xgboost/feature_importance.png)
+
+Poniżej przykład klasyfikacji odcinka:
+![Przykładowa predykcja](imgs/xgboost/best_result.png)
+
 # Generowanie raportu
 
 Powstał też moduł generowania raportu z pojedynczej analizy. Raport zapisuje obraz wejściowy, maskę segmentacji, graf naczyń oraz tabele z cechami topologicznymi.
@@ -142,30 +158,10 @@ W raporcie mogą znaleźć się między innymi:
 * liczba gałęzi,
 * długości gałęzi,
 * średnie, minimalne i maksymalne średnice,
-* liczba wykrytych bifurkacji,
-* klasyfikacja junctionów.
+* liczba wykrytych bifurkacji jak i ich klasyfikacja
 
-To jest potrzebne jako warstwa prezentacji wyników. Na razie raport opisuje głównie strukturę naczynia. Docelowo powinien zostać rozszerzony o wskazanie podejrzanych miejsc oraz uzasadnienie decyzji modelu.
+Jedyny brakujący element to wpięcie do tego modułu określającego same zmiany miażdżycowe.
 
-# Co dalej
-
-Nie planujemy już dużego etapu dalszego poprawiania segmentacji. Obecny model jest wystarczająco dobry, żeby przejść do najważniejszej części projektu, czyli rozpoznawania właściwych zmian na podstawie danych ze szkieletu.
-
-Kolejny etap powinien polegać na przygotowaniu danych treningowych dla klasyfikatora zmian. Dla każdej gałęzi albo dla krótkich okien przesuwanych wzdłuż gałęzi trzeba wyliczyć zestaw cech:
-
-* lokalną średnicę,
-* zmianę średnicy względem sąsiednich punktów,
-* długość fragmentu,
-* krętość,
-* położenie względem bifurkacji,
-* cechy sąsiednich gałęzi,
-* informację o jakości segmentacji w tym fragmencie.
-
-Następnie trzeba połączyć te cechy z adnotacjami stenoz z ARCADE. To jest najważniejszy brakujący element. Dopiero po takim rzutowaniu etykiet na gałęzie lub okna będzie można trenować model rozpoznający zmiany.
-
-Pierwszy model nie musi być skomplikowany. Sensownym startem będzie klasyfikator tabularny, na przykład Random Forest albo XGBoost, uczony na cechach wyliczonych ze skeletonu. Taki model będzie łatwiejszy do interpretacji niż sieć neuronowa i pozwoli sprawdzić, czy informacje geometryczne rzeczywiście wystarczają do wykrywania zmian.
-
-Jeżeli ten kierunek zadziała, później można testować modele sekwencyjne analizujące profil średnicy wzdłuż gałęzi albo modele grafowe. Na tym etapie ważniejsze jest jednak przygotowanie poprawnych etykiet i stabilnych cech niż wybór najbardziej złożonej architektury.
 
 # Cytowania
 
