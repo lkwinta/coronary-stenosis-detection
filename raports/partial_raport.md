@@ -36,39 +36,30 @@ Do dalszej detekcji zmian wykorzystujemy też ARCADE stenosis, ponieważ zawiera
 
 ![Przykład adnotacji stenosis z ARCADE](imgs/dataset_arcade_stenosis_annotation.png)
 
-# Wstępne wyniki
+# Segmentacja
 
-Pierwsze eksperymenty potwierdziły, że segmentacja naczyń jest możliwa, ale sama jakość maski nie wystarcza do rozwiązania problemu. Największym problemem były przerwy w naczyniach oraz artefakty, które później zaburzają skeletonizację.
+Pierwsze eksperymenty z segmentacją wypadały miernie, z DICE na poziomie `0.75`. Największy problem stanowiła duża fragmentacja maski segmentacyjnej. Z tego powodu zdecydowaliśmy się na tunning hiperparametrów przy użyciu biblioteki `optuna`.
 
-To jest ważny wniosek. Model segmentacyjny może mieć sensowne Dice i IoU, ale mały błąd lokalny potrafi całkowicie zmienić graf. Jeżeli maska zostanie przerwana, skeleton też zostanie przerwany. Jeżeli dwa naczynia zostaną sklejone, graf może dostać fałszywą bifurkację.
+Segmentację trenowaliśmy na kilku wariantach modeli, między innymi U-Net, U-Net++ i DeepLabV3+.
 
-Z tego powodu przesunęliśmy ciężar prac z samego poprawiania segmentacji na kontrolę topologiczną. Segmentacja ma dostarczyć możliwie dobrą maskę wejściową, ale dalsze etapy muszą umieć radzić sobie z jej niedoskonałościami.
-
-# Ulepszenie segmentacji
-
-Segmentację trenowaliśmy na kilku wariantach modeli, między innymi U-Net, U-Net++ i DeepLabV3+. Hiperparametry były dobierane przy pomocy Optuny. W bazie wyników znajduje się 141 zakończonych prób oraz 6 prób nieudanych.
-
-Najlepszy pojedynczy trial osiągnął walidacyjny Dice `0.8116`. Był to model U-Net++, trenowany na obrazach `256 x 256`, z optymalizatorem `AdamW` i schedulerem `ReduceLROnPlateau`.
+Najlepszy wynik na zbiorze wlidacyjnym uzyskał model U-Net++, trenowany na obrazach `256 x 256`, z optymalizatorem `AdamW` i schedulerem `ReduceLROnPlateau` - `dice=0.81`.
 
 ![Wyniki optymalizacji Optuny](imgs/optuna_results.png)
 
-Wykres pokazuje, że kilka konfiguracji dochodziło do podobnego poziomu. Nie jest to więc pojedynczy przypadek, ale raczej górny zakres tego, co udało się uzyskać w tych warunkach.
-
-Analiza ważności parametrów pokazuje, że wynik zależał głównie od wyboru konfiguracji modelu i parametrów treningu.
+Uznaliśmy że obecny efekt jest wystarczający i nie poprawimy go już więcej mając do dyspozycji tak maly zbiór danych. Próbowaliśmy też stosować większe modele, ale one z kolei bardzo szybko przeuczały.
 
 ![Ważność hiperparametrów Optuny](imgs/importance.png)
 
-Finalny model zapisany po treningu osiągnął:
+Najlepszy model na danych testowych - które nie były użyte ani do treningu ani do tunningu hiperparametrów uzyskał wyniki:
 
 * Test Dice: `0.7924`
 * Test IoU: `0.6563`
 * Test Loss: `0.1489`
 
-Do treningu dodaliśmy też komponent `clDice`, który premiuje zachowanie ciągłości struktury. Było to naturalne rozszerzenie, ponieważ w naszym zadaniu ciągłość naczyń jest ważniejsza niż sama zgodność pojedynczych pikseli.
+Do częsciowego rozwiązania problemu z ciągłością maski segmentacji zastosowaliśmy loss w postaci połączenia binarnej entropii krzyżowej i metryki clDICE, która na podstawie szkieletyzacji określa spójność segmentacji.
 
-Na tym etapie nie planujemy już poświęcać większości pracy na dalsze szlifowanie segmentacji. Przy ograniczeniach DCA1 i dostępnych maskach uznajemy, że segmentacja osiągnęła poziom wystarczający do dalszych eksperymentów. Kolejne zyski byłyby prawdopodobnie małe w stosunku do czasu, który trzeba byłoby poświęcić.
-
-Ważniejsze jest teraz wykorzystanie tej segmentacji jako wejścia do analizy topologicznej.
+Poniżej przykładowy wynik segmentacji ze zbioru testowego.
+![Przykładowy wynik testowy](imgs/example_segmentation_finetune.png)
 
 # Szkieletyzacja
 
