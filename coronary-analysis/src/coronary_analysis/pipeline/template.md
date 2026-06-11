@@ -44,6 +44,7 @@
 |---:|---|---|---:|
 {junction_rows}
 
+{xgboost_section}
 ---
 
 *Raport wygenerowany automatycznie przez coronary_analysis*

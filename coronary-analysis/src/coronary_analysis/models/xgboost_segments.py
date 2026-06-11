@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Sequence
+import pickle
 
 import numpy as np
 import pandas as pd
@@ -78,6 +79,20 @@ class XGBoostSegmentResult:
     importance: pd.DataFrame
 
 
+@dataclass
+class XGBoostSegmentArtifact:
+    """Persisted XGBoost model bundle used by the analysis pipeline.
+
+    It stores everything needed for deterministic inference: the fitted model,
+    feature order and the probability threshold selected on validation data.
+    """
+
+    model: XGBClassifier
+    feature_cols: list[str]
+    threshold: float
+    metadata: dict[str, object]
+
+
 def prepare_binary_segments(df: pd.DataFrame, label_col: str = "label") -> pd.DataFrame:
     """Keep only 0/1 labels and cast the target to int."""
     out = df.copy()
@@ -136,7 +151,8 @@ def add_neighbor_features(
             out[col] = out[col].fillna(0)
 
     numeric_cols = out.select_dtypes(include=[np.number]).columns.tolist()
-    out[numeric_cols] = out[numeric_cols].fillna(out[numeric_cols].median(numeric_only=True))
+    medians = out[numeric_cols].median(numeric_only=True).fillna(0)
+    out[numeric_cols] = out[numeric_cols].fillna(medians).fillna(0)
     return out
 
 
@@ -296,6 +312,8 @@ def train_xgboost_on_segments(
     val_size: float = 0.15,
     target_recall: float = 0.85,
     xgb_overrides: dict | None = None,
+    model_output_path: str | Path | None = None,
+    fit_verbose: int | bool = 50,
 ) -> XGBoostSegmentResult:
     """Run the full reusable XGBoost baseline pipeline."""
     xgb_df = prepare_binary_segments(df)
@@ -320,7 +338,7 @@ def train_xgboost_on_segments(
     x_test, y_test = x_all.iloc[split.test_idx], y_all.iloc[split.test_idx]
 
     model = make_xgb_classifier(y_train, random_state=random_state, **(xgb_overrides or {}))
-    model.fit(x_train, y_train, eval_set=[(x_train, y_train), (x_val, y_val)], verbose=50)
+    model.fit(x_train, y_train, eval_set=[(x_train, y_train), (x_val, y_val)], verbose=fit_verbose)
 
     proba_val = model.predict_proba(x_val)[:, 1]
     proba_test = model.predict_proba(x_test)[:, 1]
@@ -337,7 +355,7 @@ def train_xgboost_on_segments(
         {"feature": feature_cols, "importance": model.feature_importances_}
     ).sort_values("importance", ascending=False)
 
-    return XGBoostSegmentResult(
+    result = XGBoostSegmentResult(
         model=model,
         dataframe=xgb_df,
         feature_cols=feature_cols,
@@ -347,6 +365,11 @@ def train_xgboost_on_segments(
         predictions=predictions,
         importance=importance,
     )
+
+    if model_output_path is not None:
+        save_xgboost_model(result, model_output_path)
+
+    return result
 
 
 def save_xgboost_outputs(
@@ -363,3 +386,90 @@ def save_xgboost_outputs(
     result.predictions.to_csv(pred_path, index=False)
     result.importance.to_csv(importance_path, index=False)
     return pred_path, importance_path
+
+
+def save_xgboost_model(
+    result: XGBoostSegmentResult,
+    path: str | Path,
+    metadata: dict[str, object] | None = None,
+) -> Path:
+    """Serialize the trained XGBoost bundle to one file for later pipeline use."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    artifact = XGBoostSegmentArtifact(
+        model=result.model,
+        feature_cols=list(result.feature_cols),
+        threshold=float(result.selected_threshold),
+        metadata={
+            "split_seed": result.split.seed,
+            "n_features": len(result.feature_cols),
+            **(metadata or {}),
+        },
+    )
+    with path.open("wb") as f:
+        pickle.dump(artifact, f)
+    return path
+
+
+def load_xgboost_model(path: str | Path) -> XGBoostSegmentArtifact:
+    """Load an XGBoost bundle saved with :func:`save_xgboost_model`."""
+    path = Path(path)
+    with path.open("rb") as f:
+        artifact = pickle.load(f)
+
+    if isinstance(artifact, XGBoostSegmentArtifact):
+        return artifact
+
+    # Backward-compatible fallback for dict artifacts.
+    if isinstance(artifact, dict) and {"model", "feature_cols", "threshold"}.issubset(artifact):
+        return XGBoostSegmentArtifact(
+            model=artifact["model"],
+            feature_cols=list(artifact["feature_cols"]),
+            threshold=float(artifact["threshold"]),
+            metadata=dict(artifact.get("metadata", {})),
+        )
+
+    raise TypeError(f"Unsupported XGBoost artifact format in {path}")
+
+
+def prepare_segments_for_xgboost_prediction(
+    df: pd.DataFrame,
+    feature_cols: Sequence[str],
+) -> pd.DataFrame:
+    """Apply the same feature engineering as in training and return columns in model order."""
+    if df.empty:
+        return pd.DataFrame(columns=list(feature_cols))
+
+    xgb_df = add_neighbor_features(df)
+    for col in feature_cols:
+        if col not in xgb_df.columns:
+            xgb_df[col] = 0.0
+
+    x = xgb_df[list(feature_cols)].copy()
+    numeric_cols = x.select_dtypes(include=[np.number]).columns.tolist()
+    x[numeric_cols] = x[numeric_cols].replace([np.inf, -np.inf], np.nan).fillna(0)
+    return x
+
+
+def predict_xgboost_on_segments(
+    df: pd.DataFrame,
+    artifact_or_path: XGBoostSegmentArtifact | str | Path,
+) -> pd.DataFrame:
+    """Return a copy of segment rows with XGBoost stenosis probability and label."""
+    artifact = (
+        load_xgboost_model(artifact_or_path)
+        if isinstance(artifact_or_path, (str, Path))
+        else artifact_or_path
+    )
+    out = df.copy()
+    if out.empty:
+        out["xgb_pred_proba"] = []
+        out["xgb_pred_label"] = []
+        return out
+
+    x = prepare_segments_for_xgboost_prediction(out, artifact.feature_cols)
+    proba = artifact.model.predict_proba(x)[:, 1]
+    out["xgb_pred_proba"] = proba
+    out["xgb_pred_label"] = (proba >= artifact.threshold).astype(int)
+    out["xgb_threshold"] = float(artifact.threshold)
+    return out

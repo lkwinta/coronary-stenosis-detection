@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import torch
 
 from coronary_analysis.inference import (
@@ -15,6 +16,8 @@ from coronary_analysis.topology import (
     compute_distance_map,
     compute_topology_stats,
     estimate_branch_diameters,
+    graph_to_oriented_segment_rows,
+    OrientedSegmentConfig,
     prune_skeleton,
     skeletonize_mask,
 )
@@ -29,6 +32,7 @@ from coronary_analysis.topology.junction_decision import (
 from coronary_analysis.topology.junction_decision.graph_cleanup import (
     remove_false_junctions_from_skeleton,
 )
+from coronary_analysis.models.xgboost_segments import predict_xgboost_on_segments
 from coronary_analysis.utils import get_device
 
 
@@ -41,6 +45,8 @@ class AnalysisConfig:
     max_hole_size: int = 50
     min_object_size: int = 50
     min_branch_length: int = 15
+    xgboost_model_path: str | Path | None = None
+    oriented_segment_config: OrientedSegmentConfig = field(default_factory=OrientedSegmentConfig)
     junction_config: JunctionDecisionConfig = field(
         default_factory=lambda: DEFAULT_JUNCTION_DECISION_CONFIG
     )
@@ -54,6 +60,7 @@ class AnalysisResult:
     stats: dict
     branch_details: list[dict]
     junction_decision: JunctionDecisionResult
+    xgboost_segments: pd.DataFrame | None = None
 
     @property
     def junction_groups(self) -> list[dict]:
@@ -126,6 +133,42 @@ def run_analysis(
     skel_obj, branch_data = build_vessel_graph(skeleton)
     stats = compute_topology_stats(branch_data)
 
+    segment_rows = graph_to_oriented_segment_rows(
+        skel_obj=skel_obj,
+        branch_data=branch_data,
+        distance_map=dist_map,
+        image_id=0,
+        file_name=Path(image_path).name,
+        junction_decision=junction_decision,
+        used_junction_cleanup=True,
+        config=config.oriented_segment_config,
+    )
+    xgboost_segments = pd.DataFrame(segment_rows)
+
+    if config.xgboost_model_path is not None and len(xgboost_segments) > 0:
+        xgboost_segments = predict_xgboost_on_segments(
+            xgboost_segments,
+            config.xgboost_model_path,
+        )
+        positive_segments = xgboost_segments[xgboost_segments["xgb_pred_label"].astype(int) == 1]
+        stats = {
+            **stats,
+            "xgboost_model_path": str(config.xgboost_model_path),
+            "xgboost_segments_total": int(len(xgboost_segments)),
+            "xgboost_segments_positive": int(len(positive_segments)),
+            "xgboost_max_probability": float(xgboost_segments["xgb_pred_proba"].max()),
+            "xgboost_threshold": float(xgboost_segments["xgb_threshold"].iloc[0]),
+        }
+    elif config.xgboost_model_path is not None:
+        stats = {
+            **stats,
+            "xgboost_model_path": str(config.xgboost_model_path),
+            "xgboost_segments_total": 0,
+            "xgboost_segments_positive": 0,
+            "xgboost_max_probability": None,
+            "xgboost_threshold": None,
+        }
+
     branch_details = []
     for i in range(len(branch_data)):
         path = skel_obj.path_coordinates(i)
@@ -158,4 +201,5 @@ def run_analysis(
         stats=stats,
         branch_details=branch_details,
         junction_decision=junction_decision,
+        xgboost_segments=xgboost_segments,
     )
