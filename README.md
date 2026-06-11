@@ -19,9 +19,21 @@ This installs the root project and the editable local package from `coronary-ana
 The main pipeline is exposed as a Python module:
 
 ```bash
-uv run python -m coronary_analysis \
-  --image notebooks/raw_datasets/arcade/arcade/stenosis/val/images/1.png \
-  --output example_report.md
+python -m coronary_analysis \
+  --image notebooks/raw_datasets/arcade/arcade/stenosis/train/images/12.png \
+  --model models/best_segmentation_model.pth \
+  --xgboost-model models/xgboost_segments.pkl \
+  --xgboost-segments-output outputs/xgboost_segments.csv \
+  --output outputs/report.md
+```
+
+Model training
+
+```bash
+python -m coronary_analysis \
+  --train-xgboost-csv notebooks/processed/stenosis_oriented_segments/oriented_vessel_segments_train_ready.csv \
+  --xgboost-output models/xgboost_segments.pkl \
+  --xgboost-outputs-dir notebooks/processed/stenosis_oriented_segments
 ```
 
 The command loads an angiography image, predicts the vessel mask, cleans and skeletonizes it, builds the vessel topology, classifies junctions, estimates branch diameters, and writes a Markdown report. If `--output` is omitted, a timestamped report is saved in `raports/`.
